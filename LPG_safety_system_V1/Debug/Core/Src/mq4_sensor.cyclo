@@ -1,0 +1,3 @@
+../Core/Src/mq4_sensor.c:18:10:MQ4_ReadADC	1
+../Core/Src/mq4_sensor.c:22:7:MQ4_GetPPM	4
+../Core/Src/mq4_sensor.c:35:7:MQ4_CalibrateR0	3
