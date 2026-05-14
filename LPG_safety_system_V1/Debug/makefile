@@ -60,8 +60,8 @@ all: main-build
 main-build: LPG_safety_system.elf secondary-outputs
 
 # Tool invocations
-LPG_safety_system.elf LPG_safety_system.map: $(OBJS) $(USER_OBJS) C:\Users\DELL\STM32CubeIDE\workspace_1.19.0\LPG_safety_system\STM32F446ZETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "LPG_safety_system.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\DELL\STM32CubeIDE\workspace_1.19.0\LPG_safety_system\STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LPG_safety_system.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+LPG_safety_system.elf LPG_safety_system.map: $(OBJS) $(USER_OBJS) C:\Users\DELL\OneDrive\Documents\GitHub\SafeFlame\LPG_safety_system_V1\STM32F446ZETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "LPG_safety_system.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\DELL\OneDrive\Documents\GitHub\SafeFlame\LPG_safety_system_V1\STM32F446ZETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LPG_safety_system.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
