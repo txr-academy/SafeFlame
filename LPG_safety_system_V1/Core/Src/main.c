@@ -23,6 +23,7 @@
 #include "mq7_sensor.h"
 #include<stdio.h>
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -60,12 +61,12 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
-
 int __io_putchar(int ch)
 {
     HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -79,7 +80,6 @@ int __io_putchar(int ch)
   * @brief  The application entry point.
   * @retval int
   */
-
 int main(void)
 {
 
@@ -108,21 +108,21 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
-
-     MQ2_CalibrateR0();
-     MQ4_CalibrateR0();
-     MQ7_CalibrateR0();
+       MQ2_CalibrateR0();
+       MQ4_CalibrateR0();
+       MQ7_CalibrateR0();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  printf("System started...\r\n");
+       printf("System started...\r\n");
 
-      // Calibrate R0 in clean air during low phase
-      float calibrated_R0 = MQ7_CalibrateR0();
-      printf("Calibrated MQ7 R0 = %.2f kΩ\r\n", calibrated_R0);
+             // Calibrate R0 in clean air during low phase
+             float calibrated_R0 = MQ7_CalibrateR0();
+             printf("Calibrated MQ7 R0 = %.2f kΩ\r\n", calibrated_R0);
+
   while (1)
   {
 
@@ -145,7 +145,8 @@ int main(void)
 	          printf("MQ7 ADC=%lu, ppm=%.6f\r\n", mq7_adc, mq7_ppm);
 
 	          HAL_Delay(2000); // 2s delay between readings
-	      }
+
+  }
   /* USER CODE END 3 */
 }
 
@@ -347,8 +348,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB0 PB12 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_12;
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
