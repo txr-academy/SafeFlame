@@ -1,0 +1,5 @@
+../Core/Src/dht22.c:10:13:delay_us	24	static
+../Core/Src/dht22.c:17:16:DHT22_WaitForPin	24	static
+../Core/Src/dht22.c:27:13:DHT22_SetPinOutput	40	static
+../Core/Src/dht22.c:36:13:DHT22_SetPinInput	40	static
+../Core/Src/dht22.c:45:19:DHT22_Read	40	static

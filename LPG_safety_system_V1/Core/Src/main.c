@@ -18,14 +18,16 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "mq2_sensor.h"
-#include "mq4_sensor.h"
-#include "mq7_sensor.h"
-#include<stdio.h>
-
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "mq2_sensor.h"
+#include "mq4_sensor.h"
+#include "mq7_sensor.h"
+#include "hx711.h"
+#include "dht22.h"
+#include<stdio.h>
+
 
 /* USER CODE END Includes */
 
@@ -61,13 +63,15 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
+/* USER CODE BEGIN PFP */
 int __io_putchar(int ch)
 {
     HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
+HX711 hx;
+float temperature, humidity;
 
-/* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
@@ -108,44 +112,85 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
-       MQ2_CalibrateR0();
-       MQ4_CalibrateR0();
-       MQ7_CalibrateR0();
   /* USER CODE BEGIN 2 */
+ // MQ2_CalibrateR0();
+   // MQ4_CalibrateR0();
+    //MQ7_CalibrateR0();
+    // Initialize HX711 (DT=PB0, SCK=PB1)
+   // HX711_Init(&hx, GPIOB, GPIO_PIN_0, GPIOB, GPIO_PIN_1);
+
+    // Optional: perform tare
+  //  HX711_Tare(&hx, 10); // average of 10 readings
+
+    // DHT22 setup (PB12 data line)
+    printf("Initializing DHT22...\r\n");
+    // Enable DWT cycle counter
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+/*
+    printf("System started...\r\n");
+
+                 // Calibrate R0 in clean air during low phase
+                 float calibrated_R0 = MQ7_CalibrateR0();
+                 printf("Calibrated MQ7 R0 = %.2f kΩ\r\n", calibrated_R0);
+*/
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-       printf("System started...\r\n");
-
-             // Calibrate R0 in clean air during low phase
-             float calibrated_R0 = MQ7_CalibrateR0();
-             printf("Calibrated MQ7 R0 = %.2f kΩ\r\n", calibrated_R0);
 
   while (1)
   {
+	  float temp, hum;
+	  	      if (DHT22_Read(GPIOA, GPIO_PIN_0, &temp, &hum) == HAL_OK) {
+	  	          printf("Temp=%.1f °C, Hum=%.1f %%\r\n", temp, hum);
+	  	      } else {
+	  	          printf("DHT22 read error\r\n");
+	  	      }
+	  	      HAL_Delay(2000);
 
-	  // MQ7 heater cycle (HIGH then LOW)
-	          MQ7_HeaterCycle();
+	  	  /*
 
-	          // MQ2
-	          uint32_t mq2_adc = MQ2_ReadADC();
-	          float mq2_ppm = MQ2_GetPPM(mq2_adc);
-	          printf("MQ2 ADC=%lu, ppm=%.6f\r\n", mq2_adc, mq2_ppm);
+	  	  // MQ7 heater cycle (HIGH then LOW)
+	  	          MQ7_HeaterCycle();
 
-	          // MQ4
-	          uint32_t mq4_adc = MQ4_ReadADC();
-	          float mq4_ppm = MQ4_GetPPM(mq4_adc);
-	          printf("MQ4 ADC=%lu, ppm=%.6f\r\n", mq4_adc, mq4_ppm);
+	  	          // MQ2
+	  	          uint32_t mq2_adc = MQ2_ReadADC();
+	  	          float mq2_ppm = MQ2_GetPPM(mq2_adc);
+	  	          printf("MQ2 ADC=%lu, ppm=%.6f\r\n", mq2_adc, mq2_ppm);
 
-	          // MQ7 (ppm valid only in LOW phase)
-	          uint32_t mq7_adc = MQ7_ReadADC();
-	          float mq7_ppm = MQ7_GetPPM(mq7_adc);
-	          printf("MQ7 ADC=%lu, ppm=%.6f\r\n", mq7_adc, mq7_ppm);
+	  	          // MQ4
+	  	          uint32_t mq4_adc = MQ4_ReadADC();
+	  	          float mq4_ppm = MQ4_GetPPM(mq4_adc);
+	  	          printf("MQ4 ADC=%lu, ppm=%.6f\r\n", mq4_adc, mq4_ppm);
 
-	          HAL_Delay(2000); // 2s delay between readings
+	  	          // MQ7 (ppm valid only in LOW phase)
+	  	          uint32_t mq7_adc = MQ7_ReadADC();
+	  	          float mq7_ppm = MQ7_GetPPM(mq7_adc);
+	  	          printf("MQ7 ADC=%lu, ppm=%.6f\r\n", mq7_adc, mq7_ppm);
 
+	  	          HAL_Delay(2000); // 2s delay between readings
+	  	          // HX711 reading
+	  	          int32_t raw = HX711_Read(&hx);
+	  	          float weight = (float)raw / SCALE_FACTOR; // use your calibrated scale factor
+	  	          printf("Weight = %.2f kg\r\n", weight);
+
+	  	          // DHT22 reading
+	  	          if (DHT22_Read(GPIOB, GPIO_PIN_12, &temperature, &humidity) == HAL_OK) {
+	  	              printf("Temp = %.1f °C, Hum = %.1f %%\r\n", temperature, humidity);
+	  	          } else {
+	  	              printf("DHT22 read error\r\n");
+	  	          }
+	  	          */
+
+
+
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -351,7 +396,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PA0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB0 */
