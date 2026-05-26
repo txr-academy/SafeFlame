@@ -5,25 +5,15 @@
  *      Author: DELL
  */
 
-#ifndef INC_HX711_H_
-#define INC_HX711_H_
-#define SCALE_FACTOR 1000.0f   // replace 1000.0f with your calibrated value
-
+#ifndef __HX711_H
+#define __HX711_H
 
 #include "stm32f4xx_hal.h"
 
-typedef struct {
-    GPIO_TypeDef* dt_port;
-    uint16_t dt_pin;
-    GPIO_TypeDef* sck_port;
-    uint16_t sck_pin;
-} HX711;
+void HX711_Init(void);
+long HX711_Read(void);
+long HX711_Tare(int times);
+float HX711_Calibrate(long offset, float known_weight, int samples);
+float HX711_GetWeight(long offset, float factor);
 
-void HX711_Init(HX711* hx711, GPIO_TypeDef* dt_port, uint16_t dt_pin,
-                GPIO_TypeDef* sck_port, uint16_t sck_pin);
-int32_t HX711_Read(HX711* hx711);
-void HX711_Tare(HX711* hx711, uint8_t times);
-float HX711_GetWeight(HX711* hx711, float scale);
-
-
-#endif /* INC_HX711_H_ */
+#endif

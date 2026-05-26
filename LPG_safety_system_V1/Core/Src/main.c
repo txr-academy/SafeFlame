@@ -69,7 +69,7 @@ int __io_putchar(int ch)
     HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
-HX711 hx;
+
 float temperature, humidity;
 
 
@@ -116,18 +116,23 @@ int main(void)
  // MQ2_CalibrateR0();
    // MQ4_CalibrateR0();
     //MQ7_CalibrateR0();
-    // Initialize HX711 (DT=PB0, SCK=PB1)
-   // HX711_Init(&hx, GPIOB, GPIO_PIN_0, GPIOB, GPIO_PIN_1);
+  // Initialize HX711 (simple version, no arguments)
+      HX711_Init();
 
-    // Optional: perform tare
-  //  HX711_Tare(&hx, 10); // average of 10 readings
+      // Optional: tare offset (average of 10 readings)
+      // Step 1: Tare with empty cylinder
+         long offset = HX711_Tare(10);
 
-    // DHT22 setup (PB12 data line)
+         // Step 2: Place known weight (e.g., 5 kg)
+         float factor = HX711_Calibrate(offset, 2.0f, 10);
+
+    /* DHT22 setup
     printf("Initializing DHT22...\r\n");
     // Enable DWT cycle counter
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    */
 
 /*
     printf("System started...\r\n");
@@ -144,14 +149,9 @@ int main(void)
 
   while (1)
   {
-	  float temp, hum;
-	  	      if (DHT22_Read(GPIOA, GPIO_PIN_0, &temp, &hum) == HAL_OK) {
-	  	          printf("Temp=%.1f °C, Hum=%.1f %%\r\n", temp, hum);
-	  	      } else {
-	  	          printf("DHT22 read error\r\n");
-	  	      }
-	  	      HAL_Delay(2000);
-
+	  float weight = HX711_GetWeight(offset, factor);
+	          printf("Cylinder weight: %.2f kg\r\n", weight);
+	          HAL_Delay(1000);
 	  	  /*
 
 	  	  // MQ7 heater cycle (HIGH then LOW)
@@ -179,12 +179,13 @@ int main(void)
 	  	          printf("Weight = %.2f kg\r\n", weight);
 
 	  	          // DHT22 reading
-	  	          if (DHT22_Read(GPIOB, GPIO_PIN_12, &temperature, &humidity) == HAL_OK) {
+	  	          if (DHT22_Read(GPIOA, GPIO_PIN_0, &temperature, &humidity) == HAL_OK) {
 	  	              printf("Temp = %.1f °C, Hum = %.1f %%\r\n", temperature, humidity);
 	  	          } else {
 	  	              printf("DHT22 read error\r\n");
 	  	          }
-	  	          */
+	  	           HAL_Delay(2000);
+	  	   */
 
 
 

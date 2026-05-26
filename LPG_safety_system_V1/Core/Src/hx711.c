@@ -6,48 +6,47 @@
  */
 #include "hx711.h"
 
-static void HX711_Pulse(HX711* hx711) {
-    HAL_GPIO_WritePin(hx711->sck_port, hx711->sck_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
-    HAL_GPIO_WritePin(hx711->sck_port, hx711->sck_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
+void HX711_Init(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET); // PB1 = SCK
 }
 
-void HX711_Init(HX711* hx711, GPIO_TypeDef* dt_port, uint16_t dt_pin,
-                GPIO_TypeDef* sck_port, uint16_t sck_pin) {
-    hx711->dt_port = dt_port;
-    hx711->dt_pin = dt_pin;
-    hx711->sck_port = sck_port;
-    hx711->sck_pin = sck_pin;
-}
+long HX711_Read(void) {
+    long value = 0;
+    while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
 
-int32_t HX711_Read(HX711* hx711) {
-    while(HAL_GPIO_ReadPin(hx711->dt_port, hx711->dt_pin) == GPIO_PIN_SET);
-
-    int32_t value = 0;
-    for(int i=0; i<24; i++) {
-        HX711_Pulse(hx711);
-        value = (value << 1) | HAL_GPIO_ReadPin(hx711->dt_port, hx711->dt_pin);
+    for (int i = 0; i < 24; i++) {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+        value = (value << 1) | HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
     }
-    // Set gain = 128 (channel A)
-    HX711_Pulse(hx711);
 
-    if(value & 0x800000) value |= ~0xFFFFFF; // sign extend
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+
+    value ^= 0x800000; // signed conversion
     return value;
 }
 
-void HX711_Tare(HX711* hx711, uint8_t times) {
-    int64_t sum = 0;
-    for(uint8_t i=0; i<times; i++) {
-        sum += HX711_Read(hx711);
+long HX711_Tare(int times) {
+    long sum = 0;
+    for (int i = 0; i < times; i++) {
+        sum += HX711_Read();
     }
-    sum /= times;
-    // store offset globally or in struct
+    return sum / times;
 }
 
-float HX711_GetWeight(HX711* hx711, float scale) {
-    int32_t raw = HX711_Read(hx711);
-    return (float)raw / scale; // scale factor from calibration
+float HX711_Calibrate(long offset, float known_weight, int samples) {
+    long sum = 0;
+    for (int i = 0; i < samples; i++) {
+        sum += HX711_Read();
+    }
+    long avg = sum / samples;
+    long net = avg - offset;
+    return known_weight / (float)net; // factor in kg/count
 }
 
-
+float HX711_GetWeight(long offset, float factor) {
+    long raw = HX711_Read();
+    long net = raw - offset;
+    return net * factor;
+}
