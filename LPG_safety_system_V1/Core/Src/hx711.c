@@ -12,7 +12,7 @@ void HX711_Init(void) {
 
 long HX711_Read(void) {
     long value = 0;
-    while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
+    while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
 
     for (int i = 0; i < 24; i++) {
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -27,22 +27,12 @@ long HX711_Read(void) {
     return value;
 }
 
-long HX711_Tare(int times) {
-    long sum = 0;
-    for (int i = 0; i < times; i++) {
-        sum += HX711_Read();
-    }
-    return sum / times;
-}
-
-float HX711_Calibrate(long offset, float known_weight, int samples) {
+long HX711_Tare(int samples) {
     long sum = 0;
     for (int i = 0; i < samples; i++) {
         sum += HX711_Read();
     }
-    long avg = sum / samples;
-    long net = avg - offset;
-    return known_weight / (float)net; // factor in kg/count
+    return sum / samples;
 }
 
 float HX711_GetWeight(long offset, float factor) {

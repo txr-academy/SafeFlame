@@ -116,16 +116,16 @@ int main(void)
  // MQ2_CalibrateR0();
    // MQ4_CalibrateR0();
     //MQ7_CalibrateR0();
-  // Initialize HX711 (simple version, no arguments)
-      HX711_Init();
 
-      // Optional: tare offset (average of 10 readings)
-      // Step 1: Tare with empty cylinder
-         long offset = HX711_Tare(10);
+  printf("Load Cell Force Detection...\r\n");
+      // Step 1: Tare with empty platform
+      long offset = HX711_Tare(10);
+      printf("Tare offset: %ld\r\n", offset);
 
-         // Step 2: Place known weight (e.g., 5 kg)
-         float factor = HX711_Calibrate(offset, 2.0f, 10);
-
+      // Step 2: Calibration factor (temporary)
+      // Use a known weight (e.g., 5 kg) to find factor later.
+      float factor = 0.00005f; // placeholder, adjust after calibration
+      float last_weight = 0;
     /* DHT22 setup
     printf("Initializing DHT22...\r\n");
     // Enable DWT cycle counter
@@ -150,8 +150,17 @@ int main(void)
   while (1)
   {
 	  float weight = HX711_GetWeight(offset, factor);
-	          printf("Cylinder weight: %.2f kg\r\n", weight);
-	          HAL_Delay(1000);
+
+	          // Clamp negatives and tiny noise to zero
+	          if (weight < 0.05f) weight = 0;
+
+	          // Only print if weight changes significantly (>0.1 kg)
+	          if (fabs(weight - last_weight) > 0.1f) {
+	              printf("Current weight: %.2f kg\r\n", weight);
+	              last_weight = weight;
+	          }
+
+	          HAL_Delay(500); // update every 0.5 seconds
 	  	  /*
 
 	  	  // MQ7 heater cycle (HIGH then LOW)
