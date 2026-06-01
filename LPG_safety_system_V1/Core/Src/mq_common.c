@@ -2,7 +2,7 @@
  * mq_common.c
  *
  *  Created on: May 13, 2026
- *      Author: DELL
+ *      Author: Rithika
  */
 #include "mq_common.h"
 #include "main.h"

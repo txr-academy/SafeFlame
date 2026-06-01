@@ -2,7 +2,7 @@
  * hx711.h
  *
  *  Created on: May 25, 2026
- *      Author: DELL
+ *      Author: Rithika
  */
 
 #ifndef __HX711_H

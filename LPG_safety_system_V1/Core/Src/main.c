@@ -127,8 +127,11 @@ int main(void)
       float factor = 0.00005f; // placeholder, adjust after calibration
       float last_weight = 0;
     /* DHT22 setup
+     *
+     *
     printf("Initializing DHT22...\r\n");
-    // Enable DWT cycle counter
+
+    // Enable DWT cycle counter,If not enabled, CYCCNT won’t increment.
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;

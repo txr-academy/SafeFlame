@@ -2,14 +2,30 @@
  * dht22.c
  *
  *  Created on: May 25, 2026
- *      Author: DELL
+ *      Author: Rithika
  */
+
+/*This DHT22 driver implements the sensor’s single wire protocol with precise timing control.
+ * The microsecond delay function uses the STM32’s DWT cycle counter to generate accurate delays,
+ * while DHT22_WaitForPin ensures transitions occur within a timeout so the MCU never hangs.
+ * To start communication, the MCU drives the data pin low for 20 ms, then releases it and switches the pin to input mode;
+ *  the DHT22 responds with a specific low high handshake. The main read loop then captures 40 bits: each bit begins with
+ *  a low pulse, followed by a high pulse whose duration encodes 0 or 1. The code samples the line after ~40 µs to decide
+ *  the bit value and assembles the result into five bytes. A checksum verifies data integrity, and the raw humidity and
+ *  temperature values are extracted from the first four bytes, scaled by 10 to yield human readable floats. In essence,
+ *  the code handles clock like timing generation, protocol framing, error detection, and conversion, turning the DHT22’s
+ *   pulse width encoded signal into stable temperature and humidity readings. */
+
 #include "dht22.h"
 
-// Microsecond delay using DWT cycle counter
+/* Microsecond delay using DWT cycle counter.HAL_Delay() cannot be used because,DHT22 requires microsecond level operation.HAL delay can only generate ms delay.
+ * The DWT (Data Watchpoint and Trace) cycle counter is a hardware feature on ARM Cortex-M processors (like Cortex-M3, M4, M7) used for high-precision,
+ * sub-microsecond code profiling. It features a 32-bit free-running register (DWT_CYCCNT) that increments on every CPU clock cycle. */
+
+//Function definition for microsecond delay
 static void delay_us(uint32_t us) {
-    uint32_t cycles = (SystemCoreClock / 1000000) * us;
-    uint32_t start = DWT->CYCCNT;
+    uint32_t cycles = (SystemCoreClock / 1000000) * us; //SystemClock=168 MHz, us is the parameter passed by the function delay_us();
+    uint32_t start = DWT->CYCCNT; //Records current cycle count.Then it loops until the difference between the current cycle count and start reaches 168*us cycles, which gives the exact delay.
     while ((DWT->CYCCNT - start) < cycles);
 }
 

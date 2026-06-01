@@ -2,7 +2,7 @@
  * mq7_sensor.c
  *
  *  Created on: May 11, 2026
- *      Author: DELL
+ *      Author: Rithika
  */
 #include "mq7_sensor.h"
 #include "mq_common.h"

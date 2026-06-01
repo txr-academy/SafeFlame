@@ -2,7 +2,7 @@
  * dht22.h
  *
  *  Created on: May 25, 2026
- *      Author: DELL
+ *      Author:Rithika
  */
 
 #ifndef INC_DHT22_H_
