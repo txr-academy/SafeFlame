@@ -1,5 +1,5 @@
-../Core/Src/dht22.c:10:13:delay_us	2
-../Core/Src/dht22.c:17:16:DHT22_WaitForPin	3
-../Core/Src/dht22.c:27:13:DHT22_SetPinOutput	1
-../Core/Src/dht22.c:36:13:DHT22_SetPinInput	1
-../Core/Src/dht22.c:45:19:DHT22_Read	10
+../Core/Src/dht22.c:27:13:delay_us	2
+../Core/Src/dht22.c:36:16:DHT22_WaitForPin	3
+../Core/Src/dht22.c:48:13:DHT22_SetPinOutput	1
+../Core/Src/dht22.c:59:13:DHT22_SetPinInput	1
+../Core/Src/dht22.c:69:19:DHT22_Read	10

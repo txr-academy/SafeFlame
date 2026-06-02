@@ -40,7 +40,8 @@ long HX711_Read(void) {
     // Proper sign extension from 24-bit to 32-bit
         if (value & 0x800000) {        // if MSB (bit 23) is 1
             value |= 0xFF000000;       // set upper 8 bits to 1s
-}
+         }
+        return value;
 }
 
 long HX711_Tare(int samples) {
@@ -56,4 +57,30 @@ float HX711_GetWeight(long offset, float factor) {
     long net = raw - offset;           //Actual weight calculation
     return net * factor;
 }
+
+/*float HX711_Calibrate(float known_weight, int samples) {
+    // Step 1: Tare
+    long offset = HX711_Tare(samples);
+    printf("Tare offset: %ld\r\n", offset);
+
+    // Step 2: Place known reference weight
+    long sum = 0;
+    for (int i = 0; i < samples; i++) {
+        sum += HX711_Read();
+    }
+    long raw = sum / samples;
+
+    // Step 3: Net ADC counts
+    long net = raw - offset;
+
+    // Step 4: Compute calibration factor
+    float factor = known_weight / (float)net;
+    printf("Calibration factor: %.6f\r\n", factor);
+
+    return factor;
+}
+
+*/
+
+
 

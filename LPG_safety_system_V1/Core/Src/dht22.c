@@ -82,7 +82,8 @@ HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET, 100)) return HAL_ERROR;
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_SET, 100)) return HAL_ERROR;
 
-    // 3. Read 40 bits
+    /* 3. Read 40 bits
+     * 16 bits humidity, 16 bits temperature and 8 bits checksum*/
     for (int i = 0; i < 40; i++) {
         if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET, 100)) return HAL_ERROR;
         if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_SET, 100)) return HAL_ERROR;
@@ -97,7 +98,9 @@ HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
     // 4. Verify checksum
     if ((data[0] + data[1] + data[2] + data[3]) != data[4]) return HAL_ERROR;
 
-    // 5. Convert to values
+    /* 5. Convert to values
+     * (Byte1 << 8) | Byte2 is how you combine two 8 bit pieces into one 16 bit number.
+     * The left shift moves the high byte into the upper half, and the OR adds the low byte into the lower half. */
     uint16_t raw_hum = (data[0] << 8) | data[1];
     uint16_t raw_temp = (data[2] << 8) | data[3];
     *humidity = raw_hum / 10.0f;

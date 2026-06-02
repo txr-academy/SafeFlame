@@ -113,25 +113,25 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
- // MQ2_CalibrateR0();
+   // MQ2_CalibrateR0();
    // MQ4_CalibrateR0();
-    //MQ7_CalibrateR0();
+   //MQ7_CalibrateR0();
+
 
   printf("Load Cell Force Detection...\r\n");
-      // Step 1: Tare with empty platform
+      // Step 1: Tare
       long offset = HX711_Tare(10);
       printf("Tare offset: %ld\r\n", offset);
+      // Step 2: Calibration factor
 
-      // Step 2: Calibration factor (temporary)
-      // Use a known weight (e.g., 5 kg) to find factor later.
-      float factor = 0.00005f; // placeholder, adjust after calibration
+      float factor = 0.00005f; // to be adjusted after calibration
       float last_weight = 0;
     /* DHT22 setup
      *
      *
     printf("Initializing DHT22...\r\n");
 
-    // Enable DWT cycle counter,If not enabled, CYCCNT won’t increment.
+    // This line is used to enable DWT cycle counter,If not enabled, CYCCNT won’t increment.
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;

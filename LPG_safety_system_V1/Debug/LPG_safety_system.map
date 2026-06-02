@@ -265,7 +265,7 @@ Discarded input sections
  .debug_macro   0x00000000      0x293 ./Core/Src/dht22.o
  .debug_macro   0x00000000       0xba ./Core/Src/dht22.o
  .debug_macro   0x00000000      0x126 ./Core/Src/dht22.o
- .debug_line    0x00000000      0x93d ./Core/Src/dht22.o
+ .debug_line    0x00000000      0x93e ./Core/Src/dht22.o
  .debug_str     0x00000000    0xd0141 ./Core/Src/dht22.o
  .comment       0x00000000       0x44 ./Core/Src/dht22.o
  .debug_frame   0x00000000       0xc8 ./Core/Src/dht22.o
@@ -5597,26 +5597,26 @@ LOAD C:/ST/STM32CubeIDE_1.19.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.ext
  .debug_macro   0x0000386f      0x207 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
  .debug_macro   0x00003a76      0x206 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.o
 
-.debug_line     0x00000000    0x10641
- .debug_line    0x00000000      0x83f ./Core/Src/hx711.o
- .debug_line    0x0000083f      0xb44 ./Core/Src/main.o
- .debug_line    0x00001383      0x8b8 ./Core/Src/stm32f4xx_hal_msp.o
- .debug_line    0x00001c3b      0x86a ./Core/Src/stm32f4xx_it.o
- .debug_line    0x000024a5      0x8ac ./Core/Src/syscalls.o
- .debug_line    0x00002d51      0x588 ./Core/Src/sysmem.o
- .debug_line    0x000032d9      0x819 ./Core/Src/system_stm32f4xx.o
- .debug_line    0x00003af2       0x7a ./Core/Startup/startup_stm32f446zetx.o
- .debug_line    0x00003b6c      0xa95 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
- .debug_line    0x00004601     0x12b8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.o
- .debug_line    0x000058b9      0xee0 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc_ex.o
- .debug_line    0x00006799      0xd65 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
- .debug_line    0x000074fe      0xbd9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
- .debug_line    0x000080d7     0x1510 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd.o
- .debug_line    0x000095e7      0x8b5 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd_ex.o
- .debug_line    0x00009e9c      0xeb0 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
- .debug_line    0x0000ad4c     0x1561 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
- .debug_line    0x0000c2ad     0x25dd ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
- .debug_line    0x0000e88a     0x1db7 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.o
+.debug_line     0x00000000    0x10646
+ .debug_line    0x00000000      0x844 ./Core/Src/hx711.o
+ .debug_line    0x00000844      0xb44 ./Core/Src/main.o
+ .debug_line    0x00001388      0x8b8 ./Core/Src/stm32f4xx_hal_msp.o
+ .debug_line    0x00001c40      0x86a ./Core/Src/stm32f4xx_it.o
+ .debug_line    0x000024aa      0x8ac ./Core/Src/syscalls.o
+ .debug_line    0x00002d56      0x588 ./Core/Src/sysmem.o
+ .debug_line    0x000032de      0x819 ./Core/Src/system_stm32f4xx.o
+ .debug_line    0x00003af7       0x7a ./Core/Startup/startup_stm32f446zetx.o
+ .debug_line    0x00003b71      0xa95 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
+ .debug_line    0x00004606     0x12b8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.o
+ .debug_line    0x000058be      0xee0 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc_ex.o
+ .debug_line    0x0000679e      0xd65 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
+ .debug_line    0x00007503      0xbd9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
+ .debug_line    0x000080dc     0x1510 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd.o
+ .debug_line    0x000095ec      0x8b5 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_pcd_ex.o
+ .debug_line    0x00009ea1      0xeb0 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
+ .debug_line    0x0000ad51     0x1561 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
+ .debug_line    0x0000c2b2     0x25dd ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
+ .debug_line    0x0000e88f     0x1db7 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_usb.o
 
 .debug_str      0x00000000    0xd97a6
  .debug_str     0x00000000    0xd97a6 ./Core/Src/hx711.o

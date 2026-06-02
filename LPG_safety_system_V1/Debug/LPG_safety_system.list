@@ -37,15 +37,15 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  16 .debug_macro  00003c7c  00000000  00000000  0001c0c0  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   00010641  00000000  00000000  0001fd3c  2**0
+ 17 .debug_line   00010646  00000000  00000000  0001fd3c  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000d97a6  00000000  00000000  0003037d  2**0
+ 18 .debug_str    000d97a6  00000000  00000000  00030382  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  00109b23  2**0
+ 19 .comment      00000043  00000000  00000000  00109b28  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  0000440c  00000000  00000000  00109b68  2**2
+ 20 .debug_frame  0000440c  00000000  00000000  00109b6c  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 0000006c  00000000  00000000  0010df74  2**0
+ 21 .debug_line_str 0000006c  00000000  00000000  0010df78  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -1247,7 +1247,7 @@ long HX711_Read(void) {
  8000f2a:	2b00      	cmp	r3, #0
  8000f2c:	d1f8      	bne.n	8000f20 <HX711_Read+0xc>
 
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 24; i++) {               //Generate clock pulse that toggles exactly 24 times, and reads data when clock pulse is high.
  8000f2e:	2300      	movs	r3, #0
  8000f30:	603b      	str	r3, [r7, #0]
  8000f32:	e015      	b.n	8000f60 <HX711_Read+0x4c>
@@ -1256,7 +1256,7 @@ long HX711_Read(void) {
  8000f36:	2102      	movs	r1, #2
  8000f38:	4817      	ldr	r0, [pc, #92]	@ (8000f98 <HX711_Read+0x84>)
  8000f3a:	f001 fc3d 	bl	80027b8 <HAL_GPIO_WritePin>
-        value = (value << 1) | HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        value = (value << 1) | HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);// left shift the value by 1 and perform bit wise OR operation
  8000f3e:	687b      	ldr	r3, [r7, #4]
  8000f40:	005c      	lsls	r4, r3, #1
  8000f42:	2101      	movs	r1, #1
@@ -1270,7 +1270,7 @@ long HX711_Read(void) {
  8000f52:	2102      	movs	r1, #2
  8000f54:	4810      	ldr	r0, [pc, #64]	@ (8000f98 <HX711_Read+0x84>)
  8000f56:	f001 fc2f 	bl	80027b8 <HAL_GPIO_WritePin>
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 24; i++) {               //Generate clock pulse that toggles exactly 24 times, and reads data when clock pulse is high.
  8000f5a:	683b      	ldr	r3, [r7, #0]
  8000f5c:	3301      	adds	r3, #1
  8000f5e:	603b      	str	r3, [r7, #0]
@@ -1279,7 +1279,7 @@ long HX711_Read(void) {
  8000f64:	dde6      	ble.n	8000f34 <HX711_Read+0x20>
     }
 
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);//generate the 25th clock pulse to tell the processor to continue with channel A gain 128
  8000f66:	2201      	movs	r2, #1
  8000f68:	2102      	movs	r1, #2
  8000f6a:	480b      	ldr	r0, [pc, #44]	@ (8000f98 <HX711_Read+0x84>)
@@ -1300,9 +1300,10 @@ long HX711_Read(void) {
  8000f84:	687b      	ldr	r3, [r7, #4]
  8000f86:	f043 437f 	orr.w	r3, r3, #4278190080	@ 0xff000000
  8000f8a:	607b      	str	r3, [r7, #4]
+         }
+        return value;
+ 8000f8c:	687b      	ldr	r3, [r7, #4]
 }
-}
- 8000f8c:	bf00      	nop
  8000f8e:	4618      	mov	r0, r3
  8000f90:	370c      	adds	r7, #12
  8000f92:	46bd      	mov	sp, r7
@@ -1357,10 +1358,10 @@ float HX711_GetWeight(long offset, float factor) {
  8000fdc:	af00      	add	r7, sp, #0
  8000fde:	6078      	str	r0, [r7, #4]
  8000fe0:	ed87 0a00 	vstr	s0, [r7]
-    long raw = HX711_Read();
+    long raw = HX711_Read();           // The value returned by the function HX711_Read() is assigned to raw.
  8000fe4:	f7ff ff96 	bl	8000f14 <HX711_Read>
  8000fe8:	60f8      	str	r0, [r7, #12]
-    long net = raw - offset;
+    long net = raw - offset;           //Actual weight calculation
  8000fea:	68fa      	ldr	r2, [r7, #12]
  8000fec:	687b      	ldr	r3, [r7, #4]
  8000fee:	1ad3      	subs	r3, r2, r3
@@ -1441,15 +1442,15 @@ int main(void)
  800104a:	f000 f937 	bl	80012bc <MX_USB_OTG_FS_PCD_Init>
   MX_ADC1_Init();
  800104e:	f000 f8b9 	bl	80011c4 <MX_ADC1_Init>
-  /* USER CODE BEGIN 2 */
- // MQ2_CalibrateR0();
+   // MQ2_CalibrateR0();
    // MQ4_CalibrateR0();
-    //MQ7_CalibrateR0();
+   //MQ7_CalibrateR0();
+
 
   printf("Load Cell Force Detection...\r\n");
  8001052:	4820      	ldr	r0, [pc, #128]	@ (80010d4 <main+0xa0>)
  8001054:	f004 faa2 	bl	800559c <puts>
-      // Step 1: Tare with empty platform
+      // Step 1: Tare
       long offset = HX711_Tare(10);
  8001058:	200a      	movs	r0, #10
  800105a:	f7ff ff9f 	bl	8000f9c <HX711_Tare>
@@ -1458,10 +1459,9 @@ int main(void)
  8001060:	6879      	ldr	r1, [r7, #4]
  8001062:	481d      	ldr	r0, [pc, #116]	@ (80010d8 <main+0xa4>)
  8001064:	f004 fa32 	bl	80054cc <iprintf>
+      // Step 2: Calibration factor
 
-      // Step 2: Calibration factor (temporary)
-      // Use a known weight (e.g., 5 kg) to find factor later.
-      float factor = 0.00005f; // placeholder, adjust after calibration
+      float factor = 0.00005f; // adjust after calibration
  8001068:	4b1c      	ldr	r3, [pc, #112]	@ (80010dc <main+0xa8>)
  800106a:	603b      	str	r3, [r7, #0]
       float last_weight = 0;

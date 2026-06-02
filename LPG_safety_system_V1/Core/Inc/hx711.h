@@ -14,6 +14,7 @@ void HX711_Init(void);
 long HX711_Read(void);
 long HX711_Tare(int samples);
 float HX711_GetWeight(long offset, float factor);
+float HX711_Calibrate(float known_weight, int samples);
 
 #endif
 
