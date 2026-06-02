@@ -22,24 +22,29 @@
  * The DWT (Data Watchpoint and Trace) cycle counter is a hardware feature on ARM Cortex-M processors (like Cortex-M3, M4, M7) used for high-precision,
  * sub-microsecond code profiling. It features a 32-bit free-running register (DWT_CYCCNT) that increments on every CPU clock cycle. */
 
-//Function definition for microsecond delay
+/*Function definition for microsecond delay-The DHT22 protocol is timing-sensitive at the microsecond level.
+ * Micro second level delay is established using DWT counter. This ensures correct sampling of pulse widths (distinguishing between logic 0 and 1).*/
 static void delay_us(uint32_t us) {
     uint32_t cycles = (SystemCoreClock / 1000000) * us; //SystemClock=168 MHz, us is the parameter passed by the function delay_us();
     uint32_t start = DWT->CYCCNT; //Records current cycle count.Then it loops until the difference between the current cycle count and start reaches 168*us cycles, which gives the exact delay.
     while ((DWT->CYCCNT - start) < cycles);
 }
 
-// Helper: wait for pin to reach state with timeout
+/*Synchronization with the sensor’s signal transitions. Waits until the GPIO pin reaches a desired state (HIGH/LOW) within a timeout.
+ *  Prevents infinite blocking if the sensor misbehaves.
+ *Guarantees robust communication by handling timing errors gracefully. */
 static uint8_t DHT22_WaitForPin(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
                                 GPIO_PinState state, uint32_t timeout_us) {
     while (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) != state) {
-        if (timeout_us-- == 0) return 0; // timeout
+        if (timeout_us-- == 0) return 0;
         delay_us(1);
     }
-    return 1; // success
+    return 1;
 }
 
-// Switch pin to output
+/*MCU must actively drive the line low to send the start signal.Configures the pin as push-pull output.
+ *Because DHT22 requires a clear, long LOW pulse (~18–20 ms) followed by a HIGH release.
+ *Because Push pull ensures the LOW is firmly at 0 V and the HIGH is firmly at VDD, avoiding ambiguous voltage levels. */
 static void DHT22_SetPinOutput(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_Pin;
@@ -48,7 +53,9 @@ static void DHT22_SetPinOutput(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
 }
 
-// Switch pin to input with pull‑up
+/*After the start signal, the MCU must release the line and listen.If the pin is configured as input with pull-up,
+ * the sensor can drive it and enables the MCU to receive the sensor’s response and data pulses.
+ * The pull‑up resistor ensures the line defaults to a stable HIGH level when idle.*/
 static void DHT22_SetPinInput(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_Pin;
@@ -57,7 +64,8 @@ static void DHT22_SetPinInput(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
 }
 
-// Main read function
+/* Main read function- implements communication START,wait for sensor response,reading data packets,
+calculate checksum and compute real temp and humidity values.*/
 HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
                              float *temperature, float *humidity) {
     uint8_t data[5] = {0};
