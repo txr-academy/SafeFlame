@@ -23,7 +23,7 @@
 void HX711_Init(void) {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET); // PB1 = SCK
 }
-
+/*
 long HX711_Read(void) {
     long value = 0;
     while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
@@ -43,44 +43,28 @@ long HX711_Read(void) {
          }
         return value;
 }
-
+*/
 long HX711_Tare(int samples) {
     long sum = 0;
     for (int i = 0; i < samples; i++) {
-        sum += HX711_Read();
+        //sum += HX711_Read();
+
+    	//New line added for debugging
+    	static long dummy = 1000;
+    	    return dummy++;
     }
     return sum / samples;
 }
 
 float HX711_GetWeight(long offset, float factor) {
-    long raw = HX711_Read();           // The value returned by the function HX711_Read() is assigned to raw.
-    long net = raw - offset;           //Actual weight calculation
+    //long raw = HX711_Read();   // The value returned by the function HX711_Read() is assigned to raw.
+	long raw=1000;
+	long net = raw - offset;           //Actual weight calculation
     return net * factor;
+
+
 }
 
-/*float HX711_Calibrate(float known_weight, int samples) {
-    // Step 1: Tare
-    long offset = HX711_Tare(samples);
-    printf("Tare offset: %ld\r\n", offset);
-
-    // Step 2: Place known reference weight
-    long sum = 0;
-    for (int i = 0; i < samples; i++) {
-        sum += HX711_Read();
-    }
-    long raw = sum / samples;
-
-    // Step 3: Net ADC counts
-    long net = raw - offset;
-
-    // Step 4: Compute calibration factor
-    float factor = known_weight / (float)net;
-    printf("Calibration factor: %.6f\r\n", factor);
-
-    return factor;
-}
-
-*/
 
 
 
