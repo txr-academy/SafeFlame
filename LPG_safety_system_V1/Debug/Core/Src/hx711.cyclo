@@ -1,4 +1,4 @@
 ../Core/Src/hx711.c:23:6:HX711_Init	1
 ../Core/Src/hx711.c:27:6:HX711_Read	4
-../Core/Src/hx711.c:48:6:HX711_Tare	2
-../Core/Src/hx711.c:59:7:HX711_GetWeight	1
+../Core/Src/hx711.c:50:6:HX711_Tare	2
+../Core/Src/hx711.c:61:7:HX711_GetWeight	1

@@ -28,8 +28,10 @@ long HX711_Read(void) {
     long value = 0;
     while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
 
+
     for (int i = 0; i < 24; i++) {               //Generate clock pulse that toggles exactly 24 times, and reads data when clock pulse is high.
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+
         value = (value << 1) | HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);// left shift the value by 1 and perform bit wise OR operation
 
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
