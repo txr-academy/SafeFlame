@@ -23,7 +23,7 @@
 void HX711_Init(void) {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET); // PB1 = SCK
 }
-/*
+
 long HX711_Read(void) {
     long value = 0;
     while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
@@ -31,6 +31,7 @@ long HX711_Read(void) {
     for (int i = 0; i < 24; i++) {               //Generate clock pulse that toggles exactly 24 times, and reads data when clock pulse is high.
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
         value = (value << 1) | HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);// left shift the value by 1 and perform bit wise OR operation
+
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
     }
 
@@ -43,22 +44,21 @@ long HX711_Read(void) {
          }
         return value;
 }
-*/
+
 long HX711_Tare(int samples) {
     long sum = 0;
     for (int i = 0; i < samples; i++) {
         //sum += HX711_Read();
-
-    	//New line added for debugging
-    	static long dummy = 1000;
+    	/*New line added for debugging
+    	    long dummy = 1000;
     	    return dummy++;
+    	    */
     }
     return sum / samples;
 }
-
 float HX711_GetWeight(long offset, float factor) {
-    //long raw = HX711_Read();   // The value returned by the function HX711_Read() is assigned to raw.
-	long raw=1000;
+    long raw = HX711_Read();   // The value returned by the function HX711_Read() is assigned to raw.
+	//long raw=1000;
 	long net = raw - offset;           //Actual weight calculation
     return net * factor;
 

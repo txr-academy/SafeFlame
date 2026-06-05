@@ -154,12 +154,12 @@ int main(void)
   while (1)
   {
 	  float weight = HX711_GetWeight(offset, factor);
-	  //New line added for debugging purpose by isolating HX711_read()
+	  /*New line added for debugging purpose by isolating HX711_read()
 	  long raw=1000;
 	  printf("Dummy raw: %ld\r\n", raw);
-	      HAL_Delay(1000);
+	  */
 
-/*
+
 	          // Clamp negatives and tiny noise to zero
 	          if (weight < 0.05f) weight = 0;
 
@@ -167,10 +167,11 @@ int main(void)
 	          if (fabs(weight - last_weight) > 0.1f) {
 	              printf("Current weight: %.2f kg\r\n", weight);
 	              last_weight = weight;
+	              HAL_Delay(1000); // update every 1 seconds
 	          }
 
-	          HAL_Delay(1500); // update every 1.5 seconds
-	          */
+
+
 	  	  /*
 
 	  	  // MQ7 heater cycle (HIGH then LOW)
