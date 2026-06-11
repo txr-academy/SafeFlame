@@ -64,6 +64,8 @@ static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
+
+
 int __io_putchar(int ch)
 {
     HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
@@ -71,6 +73,8 @@ int __io_putchar(int ch)
 }
 
 float temperature, humidity;
+
+
 
 
 /* USER CODE END PFP */
@@ -105,6 +109,7 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -116,25 +121,24 @@ int main(void)
     // MQ2_CalibrateR0();
     // MQ4_CalibrateR0();
     // MQ7_CalibrateR0();
+  HX711_Init();
 
+  // Enable DWT cycle counter for delay_us
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
      printf("Load Cell Force Detection...\r\n");
-     long offset = HX711_Tare(10);
+     long offset = HX711_Tare(100);
      printf("Tare offset: %ld\r\n", offset);
      float factor = 0.00005f; // to be adjusted after calibration
      float last_weight = 0;
     /* DHT22 setup
      *
      *
-    printf("Initializing DHT22...\r\n");
+    //printf("Initializing DHT22...\r\n");
 
-    // This line is used to enable DWT cycle counter,If not enabled, CYCCNT won’t increment.
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-    */
 
-/*
     printf("System started...\r\n");
 
                  // Calibrate R0 in clean air during low phase
@@ -149,11 +153,9 @@ int main(void)
 
   while (1)
   {
+
+
 	  float weight = HX711_GetWeight(offset, factor);
-	  /*New line added for debugging purpose by isolating HX711_read()
-	  long raw=1000;
-	  printf("Dummy raw: %ld\r\n", raw);
-	  */
 	          // Clamp negatives and tiny noise to zero
 	          if (weight < 0.05f) weight = 0;
 

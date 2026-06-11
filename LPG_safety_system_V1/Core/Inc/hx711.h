@@ -17,4 +17,3 @@ float HX711_GetWeight(long offset, float factor);
 
 
 #endif
-
