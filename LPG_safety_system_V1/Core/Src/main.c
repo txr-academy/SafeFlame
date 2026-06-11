@@ -113,20 +113,16 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-   // MQ2_CalibrateR0();
-   // MQ4_CalibrateR0();
-   //MQ7_CalibrateR0();
+    // MQ2_CalibrateR0();
+    // MQ4_CalibrateR0();
+    // MQ7_CalibrateR0();
 
 
-  printf("Load Cell Force Detection...\r\n");
-      // Step 1: Tare
-      long offset = HX711_Tare(10);
-      printf("Tare offset: %ld\r\n", offset);
-      // Step 2: Calibration factor
-
-
-      float factor = 0.00005f; // to be adjusted after calibration
-      float last_weight = 0;
+     printf("Load Cell Force Detection...\r\n");
+     long offset = HX711_Tare(10);
+     printf("Tare offset: %ld\r\n", offset);
+     float factor = 0.00005f; // to be adjusted after calibration
+     float last_weight = 0;
     /* DHT22 setup
      *
      *
@@ -158,8 +154,6 @@ int main(void)
 	  long raw=1000;
 	  printf("Dummy raw: %ld\r\n", raw);
 	  */
-
-
 	          // Clamp negatives and tiny noise to zero
 	          if (weight < 0.05f) weight = 0;
 

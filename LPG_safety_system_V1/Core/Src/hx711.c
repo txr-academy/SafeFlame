@@ -28,7 +28,6 @@ long HX711_Read(void) {
     long value = 0;
     while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0)); // wait for DT low
 
-
     for (int i = 0; i < 24; i++) {               //Generate clock pulse that toggles exactly 24 times, and reads data when clock pulse is high.
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
 
@@ -50,7 +49,8 @@ long HX711_Read(void) {
 long HX711_Tare(int samples) {
     long sum = 0;
     for (int i = 0; i < samples; i++) {
-        //sum += HX711_Read();
+        sum += HX711_Read();
+        HAL_Delay(10);
     	/*New line added for debugging
     	    long dummy = 1000;
     	    return dummy++;
