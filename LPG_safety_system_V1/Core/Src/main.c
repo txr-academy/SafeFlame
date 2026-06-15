@@ -155,16 +155,25 @@ int main(void)
   {
 
 
-	  float weight = HX711_GetWeight(offset, factor);
+	      if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) {
+	          long value = HX711_Read();
+	          float weight = HX711_GetWeight(offset, factor);
+	          printf("Current weight: %.2f kg\r\n", weight);
+	          last_weight = weight;
+	      }
+	      // optional: HAL_Delay(10); // small delay to avoid busy loop
+
+
+	 // float weight = HX711_GetWeight(offset, factor);
 	          // Clamp negatives and tiny noise to zero
-	          if (weight < 0.05f) weight = 0;
+	         // if (weight < 0.05f) weight = 0;
 
 	          // Only print if weight changes significantly (>0.1 kg)
-	          if (fabs(weight - last_weight) > 0.1f) {
-	              printf("Current weight: %.2f kg\r\n", weight);
-	              last_weight = weight;
-	              HAL_Delay(1000); // update every 1 seconds
-	          }
+	         // if (fabs(weight - last_weight) > 0.1f) {
+	            //  printf("Current weight: %.2f kg\r\n", weight);
+	              //last_weight = weight;
+	              //HAL_Delay(100); // update every 1 seconds
+	         // }
 
 
 
