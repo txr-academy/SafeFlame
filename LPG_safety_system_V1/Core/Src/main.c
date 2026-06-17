@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -26,6 +27,7 @@
 #include "mq7_sensor.h"
 #include "hx711.h"
 #include "dht22.h"
+#include "actuator.h"
 #include<stdio.h>
 
 
@@ -33,6 +35,27 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct {
+	int32_t hx711_value;
+	    float weight;
+	    uint32_t mq2_value;
+	    float mq2_ppm;
+	    uint32_t mq4_value;
+	    float mq4_ppm;
+	    uint32_t mq7_value;
+	    float mq7_ppm;
+	    float temperature;
+	    float humidity;
+} SensorData_t;
+
+typedef struct {
+    int leakType;          // 0=Normal, 1=Slow, 2=Sudden
+    float remainingGas;    // kg
+    int anomalyFlag;       // 0/1
+    float compensatedGas;  // after environmental compensation
+    float humidity;
+} StatusData_t;
+
 
 /* USER CODE END PTD */
 
@@ -53,7 +76,20 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
+osThreadId defaultTaskHandle;
+osThreadId myTask02Handle;
+osThreadId myTask03Handle;
+osThreadId myTask04Handle;
+osThreadId myTask05Handle;
+osThreadId myTask06Handle;
+osMessageQId SensorQueueHandle;
+osMessageQId StatusQueueHandle;
 /* USER CODE BEGIN PV */
+
+/*----------------- HX711 calibration values (temporary)----------------------*/
+long offset = 0;             // tare offset (baseline)
+float factor = 0.00005f;     // ready-made calibration factor
+
 
 /* USER CODE END PV */
 
@@ -61,17 +97,24 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
+void StartDefaultTask(void const * argument);
+void SensorTask(void const * argument);
+void ProcessTask(void const * argument);
+void ControlTask(void const * argument);
+void CommunicationTask(void const * argument);
+void CompensationTask(void const * argument);
+
 /* USER CODE BEGIN PFP */
 
-
+/*---------------------UART Redirect------------------------------------------------*/
 int __io_putchar(int ch)
-{
-    HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-    return ch;
-}
-
+ {
+     HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+     return ch;
+ }
 float temperature, humidity;
 
 
@@ -118,101 +161,85 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-    // MQ2_CalibrateR0();
-    // MQ4_CalibrateR0();
-    // MQ7_CalibrateR0();
+
   HX711_Init();
 
-  // Enable DWT cycle counter for delay_us
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CYCCNT = 0;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 
-     printf("Load Cell Force Detection...\r\n");
-     long offset = HX711_Tare(100);
-     printf("Tare offset: %ld\r\n", offset);
-     float factor = 0.00005f; // to be adjusted after calibration
-     float last_weight = 0;
-    /* DHT22 setup
-     *
-     *
-    //printf("Initializing DHT22...\r\n");
+  /*---------------------- HX711 tare offset (empty load cell)----------------*/
+     offset = HX711_Tare(20);   // average of 20 samples
+
+     // Use ready-made calibration factor for now
+     factor = 0.00005f;
 
 
-    printf("System started...\r\n");
 
-                 // Calibrate R0 in clean air during low phase
-                 float calibrated_R0 = MQ7_CalibrateR0();
-                 printf("Calibrated MQ7 R0 = %.2f kΩ\r\n", calibrated_R0);
-*/
 
   /* USER CODE END 2 */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* definition and creation of SensorQueue */
+  osMessageQDef(SensorQueue, 16, uint32_t);
+  SensorQueueHandle = osMessageCreate(osMessageQ(SensorQueue), NULL);
+
+  /* definition and creation of StatusQueue */
+  osMessageQDef(StatusQueue, 16, uint32_t);
+  StatusQueueHandle = osMessageCreate(osMessageQ(StatusQueue), NULL);
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* definition and creation of defaultTask */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 512);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* definition and creation of myTask02 */
+  osThreadDef(myTask02, SensorTask, osPriorityNormal, 0, 512);
+  myTask02Handle = osThreadCreate(osThread(myTask02), NULL);
+
+  /* definition and creation of myTask03 */
+  osThreadDef(myTask03, ProcessTask, osPriorityRealtime, 0, 512);
+  myTask03Handle = osThreadCreate(osThread(myTask03), NULL);
+
+  /* definition and creation of myTask04 */
+  osThreadDef(myTask04, ControlTask, osPriorityHigh, 0, 512);
+  myTask04Handle = osThreadCreate(osThread(myTask04), NULL);
+
+  /* definition and creation of myTask05 */
+  osThreadDef(myTask05, CommunicationTask, osPriorityLow, 0, 512);
+  myTask05Handle = osThreadCreate(osThread(myTask05), NULL);
+
+  /* definition and creation of myTask06 */
+  osThreadDef(myTask06, CompensationTask, osPriorityLow, 0, 512);
+  myTask06Handle = osThreadCreate(osThread(myTask06), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
   while (1)
   {
-
-
-	      if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0) == GPIO_PIN_RESET) {
-	          long value = HX711_Read();
-	          float weight = HX711_GetWeight(offset, factor);
-	          printf("Current weight: %.2f kg\r\n", weight);
-	          last_weight = weight;
-	      }
-	      // optional: HAL_Delay(10); // small delay to avoid busy loop
-
-
-	 // float weight = HX711_GetWeight(offset, factor);
-	          // Clamp negatives and tiny noise to zero
-	         // if (weight < 0.05f) weight = 0;
-
-	          // Only print if weight changes significantly (>0.1 kg)
-	         // if (fabs(weight - last_weight) > 0.1f) {
-	            //  printf("Current weight: %.2f kg\r\n", weight);
-	              //last_weight = weight;
-	              //HAL_Delay(100); // update every 1 seconds
-	         // }
-
-
-
-	  	  /*
-
-	  	  // MQ7 heater cycle (HIGH then LOW)
-	  	          MQ7_HeaterCycle();
-
-	  	          // MQ2
-	  	          uint32_t mq2_adc = MQ2_ReadADC();
-	  	          float mq2_ppm = MQ2_GetPPM(mq2_adc);
-	  	          printf("MQ2 ADC=%lu, ppm=%.6f\r\n", mq2_adc, mq2_ppm);
-
-	  	          // MQ4
-	  	          uint32_t mq4_adc = MQ4_ReadADC();
-	  	          float mq4_ppm = MQ4_GetPPM(mq4_adc);
-	  	          printf("MQ4 ADC=%lu, ppm=%.6f\r\n", mq4_adc, mq4_ppm);
-
-	  	          // MQ7 (ppm valid only in LOW phase)
-	  	          uint32_t mq7_adc = MQ7_ReadADC();
-	  	          float mq7_ppm = MQ7_GetPPM(mq7_adc);
-	  	          printf("MQ7 ADC=%lu, ppm=%.6f\r\n", mq7_adc, mq7_ppm);
-
-	  	          HAL_Delay(2000); // 2s delay between readings
-	  	          // HX711 reading
-	  	          int32_t raw = HX711_Read(&hx);
-	  	          float weight = (float)raw / SCALE_FACTOR; // use your calibrated scale factor
-	  	          printf("Weight = %.2f kg\r\n", weight);
-
-	  	          // DHT22 reading
-	  	          if (DHT22_Read(GPIOA, GPIO_PIN_0, &temperature, &humidity) == HAL_OK) {
-	  	              printf("Temp = %.1f °C, Hum = %.1f %%\r\n", temperature, humidity);
-	  	          } else {
-	  	              printf("DHT22 read error\r\n");
-	  	          }
-	  	           HAL_Delay(2000);
-	  	   */
-
-
 
     /* USER CODE END WHILE */
 
@@ -460,6 +487,244 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void const * argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_SensorTask */
+/**
+* @brief Function implementing the myTask02 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_SensorTask */
+void SensorTask(void const * argument)
+{
+	printf("System Started...");
+  /* USER CODE BEGIN SensorTask */
+	 SensorData_t data;
+  /* Infinite loop */
+  for(;;)
+  {
+	  // MQ7 heater cycle (HIGH then LOW)
+	         MQ7_HeaterCycle();
+
+	         // HX711 (wait for DOUT low handled inside HX711_Read)
+	         data.hx711_value = HX711_Read();
+	         data.weight = HX711_GetWeight(offset, factor);
+	         printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", data.hx711_value, data.weight);
+
+	         //MQ2
+	          data.mq2_value = MQ2_ReadADC();
+	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
+	          printf("MQ2: ADC=%lu, PPM=%.2f\r\n", data.mq2_value, data.mq2_ppm);
+
+	          // MQ4
+	          data.mq4_value = MQ4_ReadADC();
+	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
+	          printf("MQ4: ADC=%lu, PPM=%.2f\r\n", data.mq4_value, data.mq4_ppm);
+
+	          // MQ7 (ppm valid only in LOW phase)
+	           data.mq7_value = MQ7_ReadADC();
+	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
+	           printf("MQ7: ADC=%lu, PPM=%.2f\r\n", data.mq7_value, data.mq7_ppm);;
+
+	           // DHT22
+	                  if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK) {
+	                      printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", data.temperature, data.humidity);
+	                  } else {
+	                      printf("DHT22: Read error\r\n");
+	                      data.temperature = -99.0f;
+	                      data.humidity = -1.0f;
+	                  }
+
+	                  // Push sensor packet into queue
+	                  osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
+
+	                  osDelay(1000); // print/update every 1 second
+  }
+  /* USER CODE END SensorTask */
+}
+
+/* USER CODE BEGIN Header_ProcessTask */
+/**
+* @brief Function implementing the myTask03 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ProcessTask */
+void ProcessTask(void const * argument)
+{
+  /* USER CODE BEGIN ProcessTask */
+    osEvent evt;
+    SensorData_t sensor;
+    static float prevWeight = 12.0f;
+    StatusData_t status;
+
+    /* Infinite loop */
+    for(;;)
+    {
+        evt = osMessageGet(SensorQueueHandle, osWaitForever);
+        if (evt.status == osEventMessage) {
+            sensor = *(SensorData_t*)evt.value.p;
+
+            // Leak classification
+            float deltaW = sensor.weight - prevWeight;
+            float rate = deltaW / 0.5f; // per 0.5s sample
+            if (rate < -2.0f) status.leakType = 2;
+            else if (rate < -0.2f) status.leakType = 1;
+            else status.leakType = 0;
+
+            // Prediction
+            status.remainingGas = sensor.weight / 0.5f;
+            status.anomalyFlag = 0;
+            status.compensatedGas = sensor.weight;
+            status.humidity = sensor.humidity;
+
+            prevWeight = sensor.weight;
+
+            osMessagePut(StatusQueueHandle, (uint32_t)&status, 0);
+        }
+    }
+  /* USER CODE END ProcessTask */
+}
+
+/* USER CODE BEGIN Header_ControlTask */
+/**
+* @brief Function implementing the myTask04 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_ControlTask */
+void ControlTask(void const * argument)
+{
+  /* USER CODE BEGIN ControlTask */
+	osEvent evt;
+    StatusData_t status;
+  /* Infinite loop */
+  for(;;)
+  {
+	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	          if (evt.status == osEventMessage) {
+	              status = *(StatusData_t*)evt.value.p;
+
+	              if (status.leakType == 2) {
+	                  //closeValve();
+	                  //soundBuzzer();
+	              }
+	              else if (status.leakType == 1) {
+	                 // soundBuzzer();
+  }
+	          }
+
+    osDelay(1);
+  }
+  /* USER CODE END ControlTask */
+}
+
+/* USER CODE BEGIN Header_CommunicationTask */
+/**
+* @brief Function implementing the myTask05 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_CommunicationTask */
+void CommunicationTask(void const * argument)
+{
+  /* USER CODE BEGIN CommunicationTask */
+	osEvent evt;
+    StatusData_t status;
+    SensorData_t sensor;
+	/* Infinite loop */
+  for(;;)
+  {
+	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	          if (evt.status == osEventMessage) {
+	              status = *(StatusData_t*)evt.value.p;
+
+	              // Get latest sensor data from SensorQueue for printing
+	              osEvent sensorEvt = osMessageGet(SensorQueueHandle, 0);
+	              if (sensorEvt.status == osEventMessage) {
+	                  sensor = *(SensorData_t*)sensorEvt.value.p;
+
+	                  printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", sensor.hx711_value, sensor.weight);
+	                  printf("MQ2: ADC=%lu, PPM=%.2f\r\n", sensor.mq2_value, sensor.mq2_ppm);
+	                  printf("MQ4: ADC=%lu, PPM=%.2f\r\n", sensor.mq4_value, sensor.mq4_ppm);
+	                  printf("MQ7: ADC=%lu, PPM=%.2f\r\n", sensor.mq7_value, sensor.mq7_ppm);
+	                  printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", sensor.temperature, sensor.humidity);
+	              }
+
+	              // Print status info as well
+	              printf("LeakType=%d, Remaining=%.1f kg, Compensated=%.2f kg\r\n",
+	                     status.leakType, status.remainingGas, status.compensatedGas);
+	          }
+
+	          osDelay(1000); // print every 1 second
+  }
+  /* USER CODE END CommunicationTask */
+}
+
+/* USER CODE BEGIN Header_CompensationTask */
+/**
+* @brief Function implementing the myTask06 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_CompensationTask */
+void CompensationTask(void const * argument)
+{
+  /* USER CODE BEGIN CompensationTask */
+	osEvent evt;
+    StatusData_t status;
+  /* Infinite loop */
+  for(;;)
+  {
+	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	         if (evt.status == osEventMessage) {
+	             status = *(StatusData_t*)evt.value.p;
+	             status.compensatedGas = status.remainingGas * (1.0f - (status.humidity * 0.001f)); // adjust for temp/humidity
+	         }
+  }
+
+  /* USER CODE END CompensationTask */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
@@ -467,11 +732,6 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
   /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT
