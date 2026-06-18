@@ -28,6 +28,7 @@
 #include "hx711.h"
 #include "dht22.h"
 #include "actuator.h"
+#include "stm32f4xx_hal.h"
 #include<stdio.h>
 
 
@@ -142,12 +143,18 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  void DWT_Init(void)
+  {
+      CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+      DWT->CYCCNT = 0;
+      DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  }
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
 
   /* Configure the system clock */
+  DWT_Init();
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
@@ -157,19 +164,26 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+
   MX_USART3_UART_Init();
+
   MX_USB_OTG_FS_PCD_Init();
+
   MX_ADC1_Init();
+
+
   /* USER CODE BEGIN 2 */
 
-  HX711_Init();
+
+  //HX711_Init();
 
 
   /*---------------------- HX711 tare offset (empty load cell)----------------*/
-     offset = HX711_Tare(20);   // average of 20 samples
+
+ // offset = HX711_Tare(20);   // average of 20 samples
 
      // Use ready-made calibration factor for now
-     factor = 0.00005f;
+    // factor = 0.00005f;
 
 
 
@@ -190,11 +204,14 @@ int main(void)
 
   /* Create the queue(s) */
   /* definition and creation of SensorQueue */
+
   osMessageQDef(SensorQueue, 16, uint32_t);
+
   SensorQueueHandle = osMessageCreate(osMessageQ(SensorQueue), NULL);
 
   /* definition and creation of StatusQueue */
   osMessageQDef(StatusQueue, 16, uint32_t);
+
   StatusQueueHandle = osMessageCreate(osMessageQ(StatusQueue), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -229,7 +246,6 @@ int main(void)
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
   /* Start scheduler */
   osKernelStart();
 
@@ -515,34 +531,44 @@ void StartDefaultTask(void const * argument)
 void SensorTask(void const * argument)
 {
 	printf("System Started...");
-  /* USER CODE BEGIN SensorTask */
+	 MQ2_CalibrateR0();
+	 MQ4_CalibrateR0();
+	 /* USER CODE BEGIN SensorTask */
 	 SensorData_t data;
   /* Infinite loop */
   for(;;)
   {
-	  // MQ7 heater cycle (HIGH then LOW)
-	         MQ7_HeaterCycle();
 
+	  // MQ7 heater cycle (HIGH then LOW)
+	        // MQ7_HeaterCycle();
+/*
 	         // HX711 (wait for DOUT low handled inside HX711_Read)
 	         data.hx711_value = HX711_Read();
 	         data.weight = HX711_GetWeight(offset, factor);
 	         printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", data.hx711_value, data.weight);
-
+*/
 	         //MQ2
+
 	          data.mq2_value = MQ2_ReadADC();
 	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
-	          printf("MQ2: ADC=%lu, PPM=%.2f\r\n", data.mq2_value, data.mq2_ppm);
+	          printf("MQ2: ADC=%lu, PPM=%.6f\r\n", data.mq2_value, data.mq2_ppm);
+	          if (data.mq2_ppm > 200.0f) {   // threshold, tune as needed
+	                 printf("MQ2: LPG detected!\r\n");
+	             }
 
 	          // MQ4
 	          data.mq4_value = MQ4_ReadADC();
 	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
-	          printf("MQ4: ADC=%lu, PPM=%.2f\r\n", data.mq4_value, data.mq4_ppm);
-
+	          printf("MQ4: ADC=%lu, PPM=%.6f\r\n", data.mq4_value, data.mq4_ppm);
+	          if (data.mq4_ppm > 500.0f) {   // threshold, tune as needed
+	          	                 printf("MQ4: Methane detected!\r\n");
+	          }
+/*
 	          // MQ7 (ppm valid only in LOW phase)
 	           data.mq7_value = MQ7_ReadADC();
 	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
-	           printf("MQ7: ADC=%lu, PPM=%.2f\r\n", data.mq7_value, data.mq7_ppm);;
-
+	           printf("MQ7: ADC=%lu, PPM=%.6f\r\n", data.mq7_value, data.mq7_ppm);;
+*/
 	           // DHT22
 	                  if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK) {
 	                      printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", data.temperature, data.humidity);
@@ -556,6 +582,8 @@ void SensorTask(void const * argument)
 	                  osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
 
 	                  osDelay(1000); // print/update every 1 second
+
+
   }
   /* USER CODE END SensorTask */
 }

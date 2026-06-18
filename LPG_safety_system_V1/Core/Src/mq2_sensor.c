@@ -9,6 +9,7 @@
 #include "mq_common.h"
 #include <math.h>
 #include <stdio.h>
+#include "stm32f4xx_hal.h"
 
 /*This MQ‑2 driver code is designed to convert raw ADC readings into meaningful gas concentration values. The sensor’s analog output is sampled by the STM32’s 12‑bit ADC
  *  (resolution = 4096 steps, with reference voltage VREF = 3.3 V),  producing a digital value that is scaled back into a voltage (v_out). Because the breakout board uses
@@ -19,23 +20,37 @@
  *   derived from the MQ‑2 datasheet for LPG. This pipeline—ADC scaling, sensor voltage reconstruction, resistance calculation, calibration of R0 and logarithmic ppm conversion
  *   —ensures accurate and stable gas concentration measurements. */
 
-static float MQ2_R0 = 10.0f;
+/*
+ * mq2_sensor.c
+ * Independent MQ-2 driver for STM32 HAL
+ * Author: Rithika
+ */
+#define MQ2_SUPPLY_VOLTAGE 3.3f
 
+static float MQ2_R0 = 1.0f;
 uint32_t MQ2_ReadADC(void) {
-    return Read_ADC_Channel(ADC_CHANNEL_10); // adjust pin accordingly
+    return Read_ADC_Channel(ADC_CHANNEL_10);
 }
-
 float MQ2_GetPPM(uint32_t adc_val) {
-    float v_out = (adc_val / ADC_RES) * VREF;//
-    float v_sensor = v_out * DIVIDER_GAIN;
-    if (v_sensor > VREF) v_sensor = VREF;
+    float v_out = ((float)adc_val / ADC_RES) * VREF;
+    float v_sensor = v_out * 1.0f; // no divider gain
 
-    float rs = ((VREF - v_sensor) * MQ2_RL_VALUE) / v_sensor;
-    if (rs <= 0.0f || MQ2_R0 <= 0.0f) return 0.0f;
 
+    if (v_sensor <= 0.01f || MQ2_R0 <= 0.0f) return 0.0f;
+
+    float rs = ((MQ2_SUPPLY_VOLTAGE - v_sensor) * MQ2_RL_VALUE) / v_sensor;
     float ratio = rs / MQ2_R0;
-    float m = -0.45f, b = 1.0f; // LPG curve
-    return pow(10, ((log10(ratio) - b) / m));
+
+    // Clamp ratio
+    if (ratio < 0.1f) ratio = 0.1f;
+    if (ratio > 10.0f) ratio = 10.0f;
+
+    // LPG curve constants
+    float m = -0.45f, b = 1.0f;
+    return powf(10.0f, ((log10f(ratio) - b) / m));
+    float ppm_mq2 = MQ2_GetPPM(adc_val);
+    printf("MQ2 PPM = %.2f\r\n", ppm_mq2);
+
 }
 
 float MQ2_CalibrateR0(void) {
@@ -46,13 +61,19 @@ float MQ2_CalibrateR0(void) {
     }
     uint32_t avg_adc = sum / 100;
 
-    float v_out = (avg_adc / ADC_RES) * VREF;
-    float v_sensor = v_out * DIVIDER_GAIN;
-    if (v_sensor > VREF) v_sensor = VREF;
+    float v_out = ((float)avg_adc / ADC_RES) * VREF;
+    float v_sensor = v_out * 1.0f;
 
-    float rs = ((VREF - v_sensor) * MQ2_RL_VALUE) / v_sensor;
-    MQ2_R0 = rs / 9.8f; // clean-air ratio
-    printf("MQ2 ADC=%lu, v_out=%.3f V, v_sensor=%.3f V, Rs=%.4f kΩ, R0=%.4f kΩ\r\n",
+    if (v_sensor <= 0.01f) {
+        MQ2_R0 = 0.0f;
+        return MQ2_R0;
+    }
+
+    float rs = ((MQ2_SUPPLY_VOLTAGE - v_sensor) * MQ2_RL_VALUE) / v_sensor;
+    MQ2_R0 = rs / 9.8f; // clean-air ratio for MQ2
+
+    printf("MQ2 Calibrated: ADC=%lu, v_out=%.3f V, v_sensor=%.3f V, Rs=%.4f kΩ, R0=%.4f kΩ\r\n",
            avg_adc, v_out, v_sensor, rs, MQ2_R0);
+
     return MQ2_R0;
 }

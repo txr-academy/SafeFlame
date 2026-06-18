@@ -36,11 +36,33 @@ void HX711_Init(void) {
 }
 
 // -------------------- Read raw 24-bit value --------------------
+//read and tare functions commented for debugging purpose
+long HX711_Read(void)
+{
+    return 1000;
+}
+
+long HX711_Tare(int samples)
+{
+    return 0;
+}
+
+/*
 long HX711_Read(void) {
     long value = 0;
 
     // Wait until DOUT goes low (data ready)
-    while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0));
+   // while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0));
+    uint32_t start = HAL_GetTick();
+
+    while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0))
+    {
+        if(HAL_GetTick() - start > 2000)
+        {
+            printf("DOUT TIMEOUT\r\n");
+            return 0;
+        }
+    }
 
     for (int i = 0; i < 24; i++) {
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -75,7 +97,7 @@ long HX711_Tare(int samples) {
     }
     return sum / samples;
 }
-
+*/
 // -------------------- Get weight --------------------
 float HX711_GetWeight(long offset, float factor) {
     long raw = HX711_Read(); // The value returned by the function HX711_Read() is assigned to raw.

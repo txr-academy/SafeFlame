@@ -9,27 +9,28 @@
 #include <math.h>
 #include <stdio.h>
 
-// Adjust RL to match your MQ4 module (often 20kΩ)
-#define MQ4_SUPPLY_VOLTAGE 5.0f
-#define MQ4_RL_VALUE 10.0f   // kΩ
+// Adjust RL to match your MQ4 module (often 5kΩ)
+#define MQ4_SUPPLY_VOLTAGE 3.3f   // use STM32 ADC reference
+#define MQ4_RL_VALUE       5.0f   // kΩ (check your board)
 
-static float MQ4_R0 = 10.0f;
+static float MQ4_R0 = 1.0f;
 
 uint32_t MQ4_ReadADC(void) {
-    return Read_ADC_Channel(ADC_CHANNEL_12); // use channel 12 as you wired
+    return Read_ADC_Channel(ADC_CHANNEL_12); // PC2 or whichever pin you wired
 }
 
 float MQ4_GetPPM(uint32_t adc_val) {
-    float v_out = (adc_val / ADC_RES) * VREF;        // voltage at STM32 pin
-    float v_sensor = v_out * DIVIDER_GAIN;           // reconstruct sensor voltage
-    if (v_sensor > MQ4_SUPPLY_VOLTAGE) v_sensor = MQ4_SUPPLY_VOLTAGE; // clamp at 5V
+    float v_out = ((float)adc_val / ADC_RES) * VREF;   // voltage at STM32 pin
+    float v_sensor = v_out * 1.0f;                     // no extra divider gain
+
+    if (v_sensor <= 0.01f || MQ4_R0 <= 0.0f) return 0.0f;
 
     float rs = ((MQ4_SUPPLY_VOLTAGE - v_sensor) * MQ4_RL_VALUE) / v_sensor;
-    if (rs <= 0.0f || MQ4_R0 <= 0.0f) return 0.0f;
-
     float ratio = rs / MQ4_R0;
-    float m = -0.38f, b = 1.3f; // CH4 curve constants
-    return pow(10, ((log10(ratio) - b) / m));
+
+    // CH4 curve constants from datasheet
+    float m = -0.38f, b = 1.3f;
+    return powf(10.0f, ((log10f(ratio) - b) / m));
 }
 
 float MQ4_CalibrateR0(void) {
@@ -40,13 +41,19 @@ float MQ4_CalibrateR0(void) {
     }
     uint32_t avg_adc = sum / 100;
 
-    float v_out = (avg_adc / ADC_RES) * VREF;
-    float v_sensor = v_out * DIVIDER_GAIN;
-    if (v_sensor > MQ4_SUPPLY_VOLTAGE) v_sensor = MQ4_SUPPLY_VOLTAGE;
+    float v_out = ((float)avg_adc / ADC_RES) * VREF;
+    float v_sensor = v_out * 1.0f; // no divider gain
+
+    if (v_sensor <= 0.01f) {
+        MQ4_R0 = 0.0f;
+        return MQ4_R0;
+    }
 
     float rs = ((MQ4_SUPPLY_VOLTAGE - v_sensor) * MQ4_RL_VALUE) / v_sensor;
     MQ4_R0 = rs / 4.4f; // clean-air ratio for MQ4
-    printf("MQ4 ADC=%lu, v_out=%.3f V, v_sensor=%.3f V, Rs=%.4f kΩ, R0=%.4f kΩ\r\n",
+
+    printf("MQ4 Calibrated: ADC=%lu, v_out=%.3f V, v_sensor=%.3f V, Rs=%.4f kΩ, R0=%.4f kΩ\r\n",
            avg_adc, v_out, v_sensor, rs, MQ4_R0);
+
     return MQ4_R0;
 }

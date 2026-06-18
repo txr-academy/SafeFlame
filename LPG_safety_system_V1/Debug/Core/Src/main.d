@@ -50,7 +50,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h \
- ../Core/Inc/mq2_sensor.h ../Core/Inc/main.h ../Core/Inc/mq4_sensor.h \
+ ../Core/Inc/mq2_sensor.h ../Core/Inc/mq4_sensor.h ../Core/Inc/main.h \
  ../Core/Inc/mq7_sensor.h ../Core/Inc/hx711.h ../Core/Inc/dht22.h \
  ../Core/Inc/actuator.h
 ../Core/Inc/main.h:
@@ -106,8 +106,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h:
 ../Core/Inc/mq2_sensor.h:
-../Core/Inc/main.h:
 ../Core/Inc/mq4_sensor.h:
+../Core/Inc/main.h:
 ../Core/Inc/mq7_sensor.h:
 ../Core/Inc/hx711.h:
 ../Core/Inc/dht22.h:

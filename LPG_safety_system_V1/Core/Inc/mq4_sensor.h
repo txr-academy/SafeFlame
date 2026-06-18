@@ -9,8 +9,8 @@
 #define MQ4_SENSOR_H
 
 #include "main.h"
-
-#define MQ4_RL_VALUE   10.0f   // Load resistor (kΩ)
+#define DIVIDER_GAIN   1.0f   // breakout already scales to 3.3V
+#define MQ4_RL_VALUE   5.0f   // Load resistor (kΩ)
 
 uint32_t MQ4_ReadADC(void);
 float MQ4_GetPPM(uint32_t adc_val);
