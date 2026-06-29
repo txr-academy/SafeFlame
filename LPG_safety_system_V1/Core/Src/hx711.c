@@ -5,7 +5,7 @@
  *      Author: Rithika
  */
 
-/*  This HX711 driver works by manually implementing the chip’s custom synchronous protocol through GPIO toggling.
+/*  This HX711 driver works by manually implementing the chip’s custom synchronous protocol through bit banging.
  *  At initialization, PB1 (SCK) is set low to establish a stable starting state.
  *   During a read, the STM32 first waits until HX711 signals data ready by pulling PB0 (DOUT) low, then generates 24 clock pulses on PB1;
  *   each rising edge causes HX711 to shift out one bit of its 24 bit ADC register, which the code assembles into value.
