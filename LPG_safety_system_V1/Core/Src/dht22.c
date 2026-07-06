@@ -81,6 +81,7 @@ HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
     // 2. Wait for sensor response with timeout
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET, 100)) return HAL_ERROR;
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_SET, 100)) return HAL_ERROR;
+    if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET,100))return HAL_ERROR;
 
     /* 3. Read 40 bits
      * 16 bits humidity, 16 bits temperature and 8 bits checksum*/
@@ -88,7 +89,7 @@ HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
         if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET, 100)) return HAL_ERROR;
         if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_SET, 100)) return HAL_ERROR;
 
-        delay_us(40);
+        delay_us(35);
         if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin))
             data[i/8] |= (1 << (7 - (i % 8)));
 

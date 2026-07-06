@@ -15,6 +15,6 @@
 uint32_t MQ7_ReadADC(void);
 float MQ7_GetPPM(uint32_t adc_val);
 float MQ7_CalibrateR0(void);
-void MQ7_HeaterCycle(void);
+
 
 #endif
