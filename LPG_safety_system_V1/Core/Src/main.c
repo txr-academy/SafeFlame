@@ -88,8 +88,8 @@ osMessageQId StatusQueueHandle;
 /* USER CODE BEGIN PV */
 
 /*----------------- HX711 calibration values (temporary)----------------------*/
-long offset = 0;             // tare offset (baseline)
-float factor = 0.00005f;     // ready-made calibration factor
+volatile long offset = 0;             // tare offset (baseline)
+volatile float factor = 0.00005f;     // ready-made calibration factor
 
 
 /* USER CODE END PV */
@@ -143,7 +143,6 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-
   /* USER CODE BEGIN Init */
 
   /* --------------DWT counter enabled----------------------------------------*/
@@ -168,15 +167,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 
-  //HX711_Init();
+  HX711_Init();
 
 
   /*---------------------- HX711 tare offset (empty load cell)----------------*/
 
- // offset = HX711_Tare(20);   // average of 20 samples
+  offset = HX711_Tare(20);   // average of 20 samples
 
      // Use ready-made calibration factor for now
-    // factor = 0.00005f;
+    factor = 0.00005f;
 
 
 
@@ -526,18 +525,18 @@ void SensorTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-/*
+
 	         // HX711 (wait for DOUT low handled inside HX711_Read)
 	         data.hx711_value = HX711_Read();
 	         data.weight = HX711_GetWeight(offset, factor);
 	         printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", data.hx711_value, data.weight);
-*/
+
 	         //MQ2
 
 	          data.mq2_value = MQ2_ReadADC();
 	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
 	          printf("MQ2: ADC=%lu, PPM=%.6f\r\n", data.mq2_value, data.mq2_ppm);
-	          if (data.mq2_ppm > 100.0f) {   // threshold, tune as needed
+	          if (data.mq2_ppm > 50.0f) {   // threshold, tune as needed
 	          printf("MQ2: LPG detected!\r\n");
 	          }
 
@@ -545,7 +544,7 @@ void SensorTask(void const * argument)
 	          data.mq4_value = MQ4_ReadADC();
 	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
 	          printf("MQ4: ADC=%lu, PPM=%.6f\r\n", data.mq4_value, data.mq4_ppm);
-	          if (data.mq4_ppm > 100.0f) {   // threshold, tune as needed
+	          if (data.mq4_ppm > 50.0f) {   // threshold, tune as needed
 	          printf("MQ4: Methane detected!\r\n");
 	          }
 
@@ -553,7 +552,7 @@ void SensorTask(void const * argument)
 	           data.mq7_value = MQ7_ReadADC();
 	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
 	           printf("MQ7: ADC=%lu, PPM=%.6f\r\n", data.mq7_value, data.mq7_ppm);
-	           if (data.mq7_ppm > 100.0f) {   // threshold, tune as needed
+	           if (data.mq7_ppm > 10.0f) {   // threshold, tune as needed
 	           printf("MQ7: Carbon Monoxide detected!\r\n");
 	           }
 	           // DHT22

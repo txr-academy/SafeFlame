@@ -36,18 +36,6 @@ void HX711_Init(void) {
 }
 
 // -------------------- Read raw 24-bit value --------------------
-//read and tare functions commented for debugging purpose
-long HX711_Read(void)
-{
-    return 1000;
-}
-
-long HX711_Tare(int samples)
-{
-    return 0;
-}
-
-/*
 long HX711_Read(void) {
     long value = 0;
 
@@ -97,7 +85,7 @@ long HX711_Tare(int samples) {
     }
     return sum / samples;
 }
-*/
+
 // -------------------- Get weight --------------------
 float HX711_GetWeight(long offset, float factor) {
     long raw = HX711_Read(); // The value returned by the function HX711_Read() is assigned to raw.

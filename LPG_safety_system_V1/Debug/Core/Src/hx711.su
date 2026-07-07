@@ -1,5 +1,5 @@
 ../Core/Src/hx711.c:26:6:delay_us	24	static
 ../Core/Src/hx711.c:33:6:HX711_Init	8	static
-../Core/Src/hx711.c:40:6:HX711_Read	4	static
-../Core/Src/hx711.c:45:6:HX711_Tare	16	static
-../Core/Src/hx711.c:102:7:HX711_GetWeight	24	static
+../Core/Src/hx711.c:39:6:HX711_Read	32	static
+../Core/Src/hx711.c:80:6:HX711_Tare	24	static
+../Core/Src/hx711.c:90:7:HX711_GetWeight	24	static

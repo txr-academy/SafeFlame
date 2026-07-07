@@ -78,7 +78,11 @@ HAL_StatusTypeDef DHT22_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin,
     delay_us(30);
     DHT22_SetPinInput(GPIOx, GPIO_Pin);
 
-    // 2. Wait for sensor response with timeout
+    /* 2. Wait for sensor response with timeout.
+     * For ensuring correct sequence, DHT22 wait LOW,wait HIGH and again wait LOW.
+     * Data bits should be read only after final handshake because it indicates
+     * sensor is ready for data reception or transmission.
+     *  */
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET, 100)) return HAL_ERROR;
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_SET, 100)) return HAL_ERROR;
     if (!DHT22_WaitForPin(GPIOx, GPIO_Pin, GPIO_PIN_RESET,100))return HAL_ERROR;
