@@ -36,6 +36,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+    LEAK_NORMAL = 0,   // No leak
+    LEAK_SLOW   = 1,   // Slow leak
+    LEAK_SUDDEN = 2    // Sudden leak
+} LeakType_t;
 typedef struct {
 	int32_t hx711_value;
 	    float weight;
@@ -50,7 +55,7 @@ typedef struct {
 } SensorData_t;
 
 typedef struct {
-    int leakType;          // 0=Normal, 1=Slow, 2=Sudden
+	LeakType_t leakType;
     float remainingGas;    // kg
     int anomalyFlag;       // 0/1
     float compensatedGas;  // after environmental compensation
@@ -177,7 +182,7 @@ int main(void)
      // Use ready-made calibration factor for now
     factor = 0.00005f;
 
-
+    printf("---------System Initializing---------\r\n");
 
 
   /* USER CODE END 2 */
@@ -243,13 +248,13 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
   while (1)
   {
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
   }
   /* USER CODE END 3 */
 }
@@ -522,6 +527,7 @@ void SensorTask(void const * argument)
 {
   /* USER CODE BEGIN SensorTask */
 	 SensorData_t data;
+
   /* Infinite loop */
   for(;;)
   {
@@ -536,7 +542,7 @@ void SensorTask(void const * argument)
 	          data.mq2_value = MQ2_ReadADC();
 	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
 	          printf("MQ2: ADC=%lu, PPM=%.6f\r\n", data.mq2_value, data.mq2_ppm);
-	          if (data.mq2_ppm > 50.0f) {   // threshold, tune as needed
+	          if (data.mq2_ppm > 100.0f) {   // threshold, TBD
 	          printf("MQ2: LPG detected!\r\n");
 	          }
 
@@ -544,7 +550,7 @@ void SensorTask(void const * argument)
 	          data.mq4_value = MQ4_ReadADC();
 	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
 	          printf("MQ4: ADC=%lu, PPM=%.6f\r\n", data.mq4_value, data.mq4_ppm);
-	          if (data.mq4_ppm > 50.0f) {   // threshold, tune as needed
+	          if (data.mq4_ppm > 100.0f) {   // threshold, TBD
 	          printf("MQ4: Methane detected!\r\n");
 	          }
 
@@ -552,7 +558,7 @@ void SensorTask(void const * argument)
 	           data.mq7_value = MQ7_ReadADC();
 	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
 	           printf("MQ7: ADC=%lu, PPM=%.6f\r\n", data.mq7_value, data.mq7_ppm);
-	           if (data.mq7_ppm > 10.0f) {   // threshold, tune as needed
+	           if (data.mq7_ppm > 50.0f) {   // threshold, TBD
 	           printf("MQ7: Carbon Monoxide detected!\r\n");
 	           }
 	           // DHT22
@@ -599,9 +605,9 @@ void ProcessTask(void const * argument)
             // Leak classification
             float deltaW = sensor.weight - prevWeight;
             float rate = deltaW / 0.5f; // per 0.5s sample
-            if (rate < -2.0f) status.leakType = 2;
-            else if (rate < -0.2f) status.leakType = 1;
-            else status.leakType = 0;
+            if (rate < -2.0f) status.leakType = LEAK_SUDDEN;
+            else if (rate < -0.2f) status.leakType = LEAK_SLOW;
+            else status.leakType = LEAK_NORMAL;
 
             // Prediction
             status.remainingGas = sensor.weight / 0.5f;
@@ -636,12 +642,19 @@ void ControlTask(void const * argument)
 	          if (evt.status == osEventMessage) {
 	              status = *(StatusData_t*)evt.value.p;
 
-	              if (status.leakType == 2) {
-	                  //closeValve();
-	                  //soundBuzzer();
-	              }
-	              else if (status.leakType == 1) {
-	                 // soundBuzzer();
+	              switch (status.leakType) {
+	                  case LEAK_SUDDEN:
+	                      // closeValve();
+	                      // soundBuzzer();
+	                      break;
+
+	                  case LEAK_SLOW:
+	                      // soundBuzzer();
+	                      break;
+
+	                  case LEAK_NORMAL:
+	                      // No action
+	                      break;
   }
 	          }
 
@@ -663,6 +676,7 @@ void CommunicationTask(void const * argument)
 	osEvent evt;
     StatusData_t status;
     SensorData_t sensor;
+    const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
 	/* Infinite loop */
   for(;;)
   {
@@ -682,9 +696,9 @@ void CommunicationTask(void const * argument)
 	                  printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", sensor.temperature, sensor.humidity);
 	              }
 
-	              // Print status info as well
-	              printf("LeakType=%d, Remaining=%.1f kg, Compensated=%.2f kg\r\n",
-	                     status.leakType, status.remainingGas, status.compensatedGas);
+	              // Print status info
+	              printf("LeakType=%s, Remaining=%.1f kg, Compensated=%.2f kg\r\n",
+	                     leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
 	          }
 
 	          osDelay(1000); // print every 1 second
