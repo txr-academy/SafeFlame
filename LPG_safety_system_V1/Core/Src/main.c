@@ -28,6 +28,7 @@
 #include "hx711.h"
 #include "dht22.h"
 #include "actuator.h"
+#include"LCD.h"
 #include "stm32f4xx_hal.h"
 #include<stdio.h>
 
@@ -77,9 +78,8 @@ typedef struct {
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-
+I2C_HandleTypeDef hi2c2;
 UART_HandleTypeDef huart3;
-
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 osThreadId defaultTaskHandle;
@@ -88,8 +88,11 @@ osThreadId myTask03Handle;
 osThreadId myTask04Handle;
 osThreadId myTask05Handle;
 osThreadId myTask06Handle;
+osThreadId myTask07Handle;
 osMessageQId SensorQueueHandle;
 osMessageQId StatusQueueHandle;
+osMutexId I2CHandle;
+
 /* USER CODE BEGIN PV */
 
 /*----------------- HX711 calibration values (temporary)----------------------*/
@@ -105,12 +108,14 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_I2C2_Init(void);
 void StartDefaultTask(void const * argument);
 void SensorTask(void const * argument);
 void ProcessTask(void const * argument);
 void ControlTask(void const * argument);
 void CommunicationTask(void const * argument);
 void CompensationTask(void const * argument);
+void lcd(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -123,12 +128,22 @@ int __io_putchar(int ch)
 float temperature, humidity;
 
 
-
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/*-------------------I2C scanner code-----------------------------------------*/
+void I2C_Scanner(void) {
+    printf("Starting I2C scan...\r\n");
+    for (uint8_t addr = 1; addr < 128; addr++) {
+        if (HAL_I2C_IsDeviceReady(&hi2c2, addr << 1, 1, 10) == HAL_OK) {
+            printf("Found device at 0x%X\r\n", addr);
+        }
+    }
+    printf("I2C scan complete.\r\n");
+}
+
 
 /* USER CODE END 0 */
 
@@ -169,23 +184,36 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
 
-
+  I2C_Scanner();   // Function call to identify slave address.
   HX711_Init();
+  lcd_init();
 
-
+  /* Added for LCD debugging
+  lcd_clear();
+  lcd_set_cursor(0,0);
+  lcd_send_string("Hello World");
+*/
   /*---------------------- HX711 tare offset (empty load cell)----------------*/
 
   offset = HX711_Tare(20);   // average of 20 samples
 
-     // Use ready-made calibration factor for now
-    factor = 0.00005f;
-
-    printf("---------System Initializing---------\r\n");
+// Use ready-made calibration factor for now
+factor = 0.00005f;
+printf("********************************************\r\n");
+printf("*          System Started                  * \r\n");
+printf("*                                          * \r\n");
+printf("********************************************\r\n");
 
 
   /* USER CODE END 2 */
+
+  /* Create the mutex(es) */
+  /* definition and creation of I2C */
+  osMutexDef(I2C);
+  I2CHandle = osMutexCreate(osMutex(I2C));
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -236,6 +264,10 @@ int main(void)
   /* definition and creation of myTask06 */
   osThreadDef(myTask06, CompensationTask, osPriorityLow, 0, 128);
   myTask06Handle = osThreadCreate(osThread(myTask06), NULL);
+
+  /* definition and creation of myTask07 */
+  osThreadDef(myTask07, lcd, osPriorityNormal, 0, 256);
+  myTask07Handle = osThreadCreate(osThread(myTask07), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -358,6 +390,40 @@ static void MX_ADC1_Init(void)
 }
 
 /**
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
+
+  /* USER CODE BEGIN I2C2_Init 0 */
+
+  /* USER CODE END I2C2_Init 0 */
+
+  /* USER CODE BEGIN I2C2_Init 1 */
+
+  /* USER CODE END I2C2_Init 1 */
+  hi2c2.Instance = I2C2;
+  hi2c2.Init.ClockSpeed = 100000;
+  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c2.Init.OwnAddress1 = 0;
+  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c2.Init.OwnAddress2 = 0;
+  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C2_Init 2 */
+
+  /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -439,6 +505,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -729,6 +796,57 @@ void CompensationTask(void const * argument)
   }
 
   /* USER CODE END CompensationTask */
+}
+
+/* USER CODE BEGIN Header_lcd */
+/**
+* @brief Function implementing the myTask07 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_lcd */
+void lcd(void const * argument)
+{
+  /* USER CODE BEGIN lcd */
+	osEvent evt;
+	StatusData_t status;
+    SensorData_t sensor;
+	const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
+  /* Infinite loop */
+  for(;;)
+  {
+	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	          if (evt.status == osEventMessage) {
+	              status = *(StatusData_t*)evt.value.p;
+
+	              osEvent sensorEvt = osMessageGet(SensorQueueHandle, 0);
+	               if (sensorEvt.status == osEventMessage) {
+	               sensor = *(SensorData_t*)sensorEvt.value.p;
+	               // Protect I2C with mutex
+	                           if (osMutexWait(I2CHandle, osWaitForever) == osOK) {
+	                               lcd_clear();
+	                               HAL_Delay(2);
+
+
+	                               lcd_set_cursor(0,0);
+	                               char line1[16];
+	                               snprintf(line1, sizeof(line1), "Gas:%.1fkg",
+	                                        status.remainingGas);
+	                               lcd_send_string(line1);
+
+
+	                               lcd_set_cursor(1,0);
+	                               lcd_send_string("Leak:");
+	                               lcd_send_string(leakTypeStr[status.leakType]);
+
+	                               osMutexRelease(I2CHandle);
+	              }
+	          }
+
+	     }
+    osDelay(1000);
+  }
+  /* USER CODE END lcd */
 }
 
 /**
