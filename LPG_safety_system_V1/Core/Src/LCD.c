@@ -17,7 +17,12 @@ void lcd_send_cmd(char cmd) {
     data_t[1] = data_u|0x08;  // en=0, rs=0
     data_t[2] = data_l|0x0C;  // en=1, rs=0
     data_t[3] = data_l|0x08;  // en=0, rs=0
-    HAL_I2C_Master_Transmit(&hi2c2, LCD_ADDR, data_t, 4, 100);
+    if( HAL_I2C_Master_Transmit(&hi2c2, LCD_ADDR, data_t, 4, 100));
+    {
+           // Handle error
+           return HAL_ERROR;
+       }
+       return HAL_OK;
 }
 
 void lcd_send_data(char data) {
@@ -55,6 +60,7 @@ void lcd_init(void) {
     lcd_send_cmd(0x30);
     HAL_Delay(10);
     lcd_send_cmd(0x20); // 4-bit mode
+    HAL_Delay(10);
 
     lcd_send_cmd(0x28); // 2 line, 5x8 matrix
     lcd_send_cmd(0x08); // display off
@@ -62,5 +68,6 @@ void lcd_init(void) {
     HAL_Delay(2);
     lcd_send_cmd(0x06); // entry mode
     lcd_send_cmd(0x0C); // display on, cursor off
+
 }
 

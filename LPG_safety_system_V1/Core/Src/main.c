@@ -43,7 +43,7 @@ typedef enum {
     LEAK_SUDDEN = 2    // Sudden leak
 } LeakType_t;
 typedef struct {
-	int32_t hx711_value;
+	    int32_t hx711_value;//hx711 outputs data in 2's complement format.
 	    float weight;
 	    uint32_t mq2_value;
 	    float mq2_ppm;
@@ -61,6 +61,7 @@ typedef struct {
     int anomalyFlag;       // 0/1
     float compensatedGas;  // after environmental compensation
     float humidity;
+    float weight;
 } StatusData_t;
 
 
@@ -78,8 +79,11 @@ typedef struct {
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c2;
+
 UART_HandleTypeDef huart3;
+
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 osThreadId defaultTaskHandle;
@@ -91,8 +95,6 @@ osThreadId myTask06Handle;
 osThreadId myTask07Handle;
 osMessageQId SensorQueueHandle;
 osMessageQId StatusQueueHandle;
-osMutexId I2CHandle;
-
 /* USER CODE BEGIN PV */
 
 /*----------------- HX711 calibration values (temporary)----------------------*/
@@ -134,6 +136,7 @@ float temperature, humidity;
 /* USER CODE BEGIN 0 */
 
 /*-------------------I2C scanner code-----------------------------------------*/
+/*
 void I2C_Scanner(void) {
     printf("Starting I2C scan...\r\n");
     for (uint8_t addr = 1; addr < 128; addr++) {
@@ -143,7 +146,7 @@ void I2C_Scanner(void) {
     }
     printf("I2C scan complete.\r\n");
 }
-
+*/
 
 /* USER CODE END 0 */
 
@@ -187,9 +190,12 @@ int main(void)
   MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
 
-  I2C_Scanner();   // Function call to identify slave address.
+ // I2C_Scanner();   // Function call to identify slave address.
   HX711_Init();
   lcd_init();
+
+
+
 
   /* Added for LCD debugging
   lcd_clear();
@@ -210,11 +216,6 @@ printf("********************************************\r\n");
 
   /* USER CODE END 2 */
 
-  /* Create the mutex(es) */
-  /* definition and creation of I2C */
-  osMutexDef(I2C);
-  I2CHandle = osMutexCreate(osMutex(I2C));
-
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
@@ -229,11 +230,11 @@ printf("********************************************\r\n");
 
   /* Create the queue(s) */
   /* definition and creation of SensorQueue */
-  osMessageQDef(SensorQueue, 16, 20);
+  osMessageQDef(SensorQueue, 16, uint32_t);
   SensorQueueHandle = osMessageCreate(osMessageQ(SensorQueue), NULL);
 
   /* definition and creation of StatusQueue */
-  osMessageQDef(StatusQueue, 16, 12);
+  osMessageQDef(StatusQueue, 16, uint32_t);
   StatusQueueHandle = osMessageCreate(osMessageQ(StatusQueue), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -593,54 +594,58 @@ void StartDefaultTask(void const * argument)
 void SensorTask(void const * argument)
 {
   /* USER CODE BEGIN SensorTask */
-	 SensorData_t data;
+	static SensorData_t data;
 
   /* Infinite loop */
   for(;;)
   {
 
-	         // HX711 (wait for DOUT low handled inside HX711_Read)
-	         data.hx711_value = HX711_Read();
-	         data.weight = HX711_GetWeight(offset, factor);
-	         printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", data.hx711_value, data.weight);
+	  // HX711 (wait for DOUT low handled inside HX711_Read)
+	 	         data.hx711_value = HX711_Read();
+	 	         data.weight = HX711_GetWeight(offset, factor);
+	 	         printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", data.hx711_value, data.weight);
 
-	         //MQ2
+	 	         //MQ2
 
-	          data.mq2_value = MQ2_ReadADC();
-	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
-	          printf("MQ2: ADC=%lu, PPM=%.6f\r\n", data.mq2_value, data.mq2_ppm);
-	          if (data.mq2_ppm > 100.0f) {   // threshold, TBD
-	          printf("MQ2: LPG detected!\r\n");
-	          }
+	 	          data.mq2_value = MQ2_ReadADC();
+	 	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
+	 	          printf("MQ2: ADC=%lu, PPM=%.6f\r\n", data.mq2_value, data.mq2_ppm);
+	 	          if (data.mq2_ppm > 100.0f) {   // threshold, TBD
+	 	          printf("MQ2: LPG detected!\r\n");
+	 	          }
 
-	          // MQ4
-	          data.mq4_value = MQ4_ReadADC();
-	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
-	          printf("MQ4: ADC=%lu, PPM=%.6f\r\n", data.mq4_value, data.mq4_ppm);
-	          if (data.mq4_ppm > 100.0f) {   // threshold, TBD
-	          printf("MQ4: Methane detected!\r\n");
-	          }
+	 	          // MQ4
+	 	          data.mq4_value = MQ4_ReadADC();
+	 	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
+	 	          printf("MQ4: ADC=%lu, PPM=%.6f\r\n", data.mq4_value, data.mq4_ppm);
+	 	          if (data.mq4_ppm > 100.0f) {   // threshold, TBD
+	 	          printf("MQ4: Methane detected!\r\n");
+	 	          }
 
-	          // MQ7
-	           data.mq7_value = MQ7_ReadADC();
-	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
-	           printf("MQ7: ADC=%lu, PPM=%.6f\r\n", data.mq7_value, data.mq7_ppm);
-	           if (data.mq7_ppm > 50.0f) {   // threshold, TBD
-	           printf("MQ7: Carbon Monoxide detected!\r\n");
-	           }
-	           // DHT22
-               if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK) {
-	           printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", data.temperature, data.humidity);
-	           }
-               else {
-	           printf("DHT22: Read error\r\n");
-	           data.temperature = -99.0f;
-	           data.humidity = -1.0f;
-	                  }
+	 	          // MQ7
+	 	           data.mq7_value = MQ7_ReadADC();
+	 	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
+	 	           printf("MQ7: ADC=%lu, PPM=%.6f\r\n", data.mq7_value, data.mq7_ppm);
+	 	           if (data.mq7_ppm > 50.0f) {   // threshold, TBD
+	 	           printf("MQ7: Carbon Monoxide detected!\r\n");
+	 	           }
+	 	           // DHT22
+	                if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK) {
+	 	           printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", data.temperature, data.humidity);
+	 	           }
+	                else {
+	 	           printf("DHT22: Read error\r\n");
+	 	           data.temperature = -99.0f;
+	 	           data.humidity = -1.0f;
+	 	                  }
 
-	           // Push sensor packet into queue
-	           osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
-               osDelay(1000); // print/update every 1 second
+	 	           // Push sensor packet into queue
+	 	          osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
+	 	         printf("SensorTask: pushed weight=%.2f\r\n", data.weight);
+
+	              osDelay(1000); // print/update every 1 second
+
+
 
 
   }
@@ -657,35 +662,40 @@ void SensorTask(void const * argument)
 void ProcessTask(void const * argument)
 {
   /* USER CODE BEGIN ProcessTask */
-    osEvent evt;
-    SensorData_t sensor;
-    static float prevWeight = 12.0f;
-    StatusData_t status;
+	osEvent evt;
+	    SensorData_t sensor;
+	    static float prevWeight = 12.0f;
+	    static StatusData_t status;
+
 
     /* Infinite loop */
     for(;;)
     {
-        evt = osMessageGet(SensorQueueHandle, osWaitForever);
-        if (evt.status == osEventMessage) {
-            sensor = *(SensorData_t*)evt.value.p;
 
-            // Leak classification
-            float deltaW = sensor.weight - prevWeight;
-            float rate = deltaW / 0.5f; // per 0.5s sample
-            if (rate < -2.0f) status.leakType = LEAK_SUDDEN;
-            else if (rate < -0.2f) status.leakType = LEAK_SLOW;
-            else status.leakType = LEAK_NORMAL;
+    	 evt = osMessageGet(SensorQueueHandle, osWaitForever);
+    	        if (evt.status == osEventMessage) {
+    	        	 SensorData_t *sensorPtr = (SensorData_t *)evt.value.p;
+    	        	 sensor = *sensorPtr;
+    	            // Leak classification
+    	            float deltaW = sensor.weight - prevWeight;
+    	            float rate = deltaW / 0.5f; // per 0.5s sample
+    	            if (rate < -2.0f) status.leakType = LEAK_SUDDEN;
+    	            else if (rate < -0.2f) status.leakType = LEAK_SLOW;
+    	            else status.leakType = LEAK_NORMAL;
 
-            // Prediction
-            status.remainingGas = sensor.weight / 0.5f;
-            status.anomalyFlag = 0;
-            status.compensatedGas = sensor.weight;
-            status.humidity = sensor.humidity;
+    	            // Prediction
+    	            status.remainingGas = sensor.weight / 0.5f;
+    	            status.anomalyFlag = 0;
+    	            status.compensatedGas = sensor.weight;
+    	            status.humidity = sensor.humidity;
+    	            status.weight = sensor.weight;
+    	            prevWeight = sensor.weight;
 
-            prevWeight = sensor.weight;
+    	            printf("ProcessTask: Sending status\r\n");// Added for debugging
+    	            osMessagePut(StatusQueueHandle, (uint32_t)&status, 0);
+    	            printf("ProcessTask: pushed status weight=%.2f\r\n", status.weight);
 
-            osMessagePut(StatusQueueHandle, (uint32_t)&status, 0);
-        }
+    }
     }
   /* USER CODE END ProcessTask */
 }
@@ -703,11 +713,14 @@ void ControlTask(void const * argument)
 	osEvent evt;
     StatusData_t status;
   /* Infinite loop */
+
   for(;;)
   {
-	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	  evt = osMessageGet(StatusQueueHandle,100);
 	          if (evt.status == osEventMessage) {
-	              status = *(StatusData_t*)evt.value.p;
+	          StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
+	       	  status = *statusPtr;   // copy into local struct
+
 
 	              switch (status.leakType) {
 	                  case LEAK_SUDDEN:
@@ -727,6 +740,7 @@ void ControlTask(void const * argument)
 
     osDelay(1);
   }
+
   /* USER CODE END ControlTask */
 }
 
@@ -741,35 +755,43 @@ void CommunicationTask(void const * argument)
 {
   /* USER CODE BEGIN CommunicationTask */
 	osEvent evt;
-    StatusData_t status;
-    SensorData_t sensor;
-    const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
+	    StatusData_t status;
+	    SensorData_t sensor;
+	    const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
+
 	/* Infinite loop */
   for(;;)
   {
 	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
-	          if (evt.status == osEventMessage) {
-	              status = *(StatusData_t*)evt.value.p;
+	  	       if (evt.status == osEventMessage) {
+	  	       StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
+	  	       status = *statusPtr;
 
-	              // Get latest sensor data from SensorQueue for printing
-	              osEvent sensorEvt = osMessageGet(SensorQueueHandle, 0);
-	              if (sensorEvt.status == osEventMessage) {
-	                  sensor = *(SensorData_t*)sensorEvt.value.p;
 
-	                  printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", sensor.hx711_value, sensor.weight);
-	                  printf("MQ2: ADC=%lu, PPM=%.2f\r\n", sensor.mq2_value, sensor.mq2_ppm);
-	                  printf("MQ4: ADC=%lu, PPM=%.2f\r\n", sensor.mq4_value, sensor.mq4_ppm);
-	                  printf("MQ7: ADC=%lu, PPM=%.2f\r\n", sensor.mq7_value, sensor.mq7_ppm);
-	                  printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", sensor.temperature, sensor.humidity);
-	              }
+	  	              // Get latest sensor data from SensorQueue for printing
+	  	              osEvent sensorEvt = osMessageGet(SensorQueueHandle, 0);
+	  	              if (sensorEvt.status == osEventMessage) {
+	  	                  sensor = *(SensorData_t*)sensorEvt.value.p;
 
-	              // Print status info
-	              printf("LeakType=%s, Remaining=%.1f kg, Compensated=%.2f kg\r\n",
-	                     leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	                  printf("HX711: Raw=%ld, Weight=%.2f kg\r\n", sensor.hx711_value, sensor.weight);
+	  	                  printf("MQ2: ADC=%lu, PPM=%.2f\r\n", sensor.mq2_value, sensor.mq2_ppm);
+	  	                  printf("MQ4: ADC=%lu, PPM=%.2f\r\n", sensor.mq4_value, sensor.mq4_ppm);
+	  	                  printf("MQ7: ADC=%lu, PPM=%.2f\r\n", sensor.mq7_value, sensor.mq7_ppm);
+	  	                  printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", sensor.temperature, sensor.humidity);
+	  	              }
+
+	  	              // Print status info
+	  	              printf("LeakType=%s, Remaining=%.1f kg, Compensated=%.2f kg\r\n",
+	  	                     leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	          }
+
+	  	          osDelay(1000); // print every 1 second
+
+
 	          }
 
-	          osDelay(1000); // print every 1 second
-  }
+	          osDelay(100); // print every 100ms
+
   /* USER CODE END CommunicationTask */
 }
 
@@ -780,9 +802,11 @@ void CommunicationTask(void const * argument)
 * @retval None
 */
 /* USER CODE END Header_CompensationTask */
+
 void CompensationTask(void const * argument)
 {
   /* USER CODE BEGIN CompensationTask */
+
 	osEvent evt;
     StatusData_t status;
   /* Infinite loop */
@@ -790,8 +814,10 @@ void CompensationTask(void const * argument)
   {
 	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
 	         if (evt.status == osEventMessage) {
-	             status = *(StatusData_t*)evt.value.p;
-	             status.compensatedGas = status.remainingGas * (1.0f - (status.humidity * 0.001f)); // adjust for temp/humidity
+	        	 StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
+	        	 status = *statusPtr;
+	        	 status.compensatedGas = status.remainingGas * (1.0f - (status.humidity * 0.001f));
+
 	         }
   }
 
@@ -810,42 +836,35 @@ void lcd(void const * argument)
   /* USER CODE BEGIN lcd */
 	osEvent evt;
 	StatusData_t status;
-    SensorData_t sensor;
 	const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
+	char line1[17];
+	char line2[17];
+	lcd_clear();
+	lcd_set_cursor(0,0);
+	lcd_send_string("LCD Task Started");
+
+	//int page=0;
   /* Infinite loop */
   for(;;)
   {
-	  evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	          evt = osMessageGet(StatusQueueHandle, osWaitForever);
 	          if (evt.status == osEventMessage) {
-	              status = *(StatusData_t*)evt.value.p;
-
-	              osEvent sensorEvt = osMessageGet(SensorQueueHandle, 0);
-	               if (sensorEvt.status == osEventMessage) {
-	               sensor = *(SensorData_t*)sensorEvt.value.p;
-	               // Protect I2C with mutex
-	                           if (osMutexWait(I2CHandle, osWaitForever) == osOK) {
-	                               lcd_clear();
-	                               HAL_Delay(2);
-
-
-	                               lcd_set_cursor(0,0);
-	                               char line1[16];
-	                               snprintf(line1, sizeof(line1), "Gas:%.1fkg",
-	                                        status.remainingGas);
-	                               lcd_send_string(line1);
-
-
-	                               lcd_set_cursor(1,0);
-	                               lcd_send_string("Leak:");
-	                               lcd_send_string(leakTypeStr[status.leakType]);
-
-	                               osMutexRelease(I2CHandle);
-	              }
+	          StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
+	          printf("LCD Task: got status weight=%.2f\r\n", statusPtr->weight);//Added for debugging
+	        	 // Debug print to UART
+	        	 printf("LCD Debug: weight=%.2f, leak=%d\r\n", statusPtr->weight, statusPtr->leakType);
+	        	 snprintf(line1, sizeof(line1), "Gas:%.1fkg", statusPtr->weight);
+	        	 snprintf(line2, sizeof(line2), "Leak:%s", leakTypeStr[statusPtr->leakType]);
 	          }
 
-	     }
-    osDelay(1000);
-  }
+	          lcd_clear();
+	          lcd_set_cursor(0,0);
+	          lcd_send_string(line1);
+	          lcd_set_cursor(1,0);
+	          lcd_send_string(line2);
+              osDelay(2000);
+
+     }
   /* USER CODE END lcd */
 }
 

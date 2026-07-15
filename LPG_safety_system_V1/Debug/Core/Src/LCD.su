@@ -1,6 +1,6 @@
 ../Core/Src/LCD.c:11:6:lcd_send_cmd	32	static
-../Core/Src/LCD.c:23:6:lcd_send_data	32	static
-../Core/Src/LCD.c:35:6:lcd_clear	8	static
-../Core/Src/LCD.c:40:6:lcd_set_cursor	40	static
-../Core/Src/LCD.c:45:6:lcd_send_string	16	static
-../Core/Src/LCD.c:49:6:lcd_init	8	static
+../Core/Src/LCD.c:28:6:lcd_send_data	32	static
+../Core/Src/LCD.c:40:6:lcd_clear	8	static
+../Core/Src/LCD.c:45:6:lcd_set_cursor	40	static
+../Core/Src/LCD.c:50:6:lcd_send_string	16	static
+../Core/Src/LCD.c:54:6:lcd_init	8	static
