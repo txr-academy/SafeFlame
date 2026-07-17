@@ -139,7 +139,17 @@ int __io_putchar(int ch)
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+/*
+ * -------------------Code segment to use ITMViewer-----------------------------
+int _write(int file, char *ptr, int len)
+{
+	for (int i=0; i<len; i++)
+	{
+		ITM_SendChar(ptr[i]);
+	}
+	return len;
+}
+*/
 /*-------------------I2C scanner code-----------------------------------------*/
 /*
 void I2C_Scanner(void) {
@@ -653,14 +663,15 @@ void ProcessTask(void const * argument)
 	    SensorData_t sensor;
 	    static float prevWeight = 12.0f;
 	    static StatusData_t status;
+	    static float dailyConsumption[7]={0};
+	    static int dayIndex=0,dayCount=0;
 
     /* Infinite loop */
     for(;;)
     {
     	            evt = osMessageGet(SensorQueueHandle, osWaitForever);
     	            if (evt.status == osEventMessage) {
-    	        	SensorData_t *sensorPtr = (SensorData_t *)evt.value.p;
-    	        	sensor = *sensorPtr;
+    	        	sensor= *(SensorData_t *)evt.value.p;
     	            // Leak classification
     	            float deltaW = sensor.weight - prevWeight;
     	            float rate = deltaW / 0.5f; // per 0.5s sample
@@ -668,23 +679,49 @@ void ProcessTask(void const * argument)
     	            else if (rate < -0.2f) status.leakType = LEAK_SLOW;
     	            else status.leakType = LEAK_NORMAL;
 
+    	            //Gas identification
+    	            if(sensor.mq2_ppm>200 && sensor.mq4_ppm>200)
+    	                status.anomalyFlag=1;
+    	            else if (sensor.mq7_ppm >100 && sensor.mq2_ppm>200)
+    	            	status.anomalyFlag=2;
+    	            else
+    	            	status.anomalyFlag=0;
+    	            // Compensation factors
+    	            float tempFactor     = 1.0f - (sensor.temperature - 25.0f) * 0.01f;
+    	            float humidityFactor = 1.0f - (sensor.humidity - 40.0f) * 0.001f;
+
+    	            // Apply compensation to sensor curves (ppm values)
+    	            status.mq2_ppm = MQ2_GetPPM(sensor.mq2_value) * tempFactor * humidityFactor;
+    	            status.mq4_ppm = MQ4_GetPPM(sensor.mq4_value) * tempFactor * humidityFactor;
+    	            status.mq7_ppm = MQ7_GetPPM(sensor.mq7_value) * tempFactor * humidityFactor;
+
     	            // Prediction
-    	            status.remainingGas = sensor.weight / 0.5f;
-    	            status.anomalyFlag = 0;
-    	            status.compensatedGas = sensor.weight;
+
+    	            float consumedToday = prevWeight - sensor.weight;
+    	            if (consumedToday > 0.1f) {
+    	            dailyConsumption[dayIndex] = consumedToday;
+    	            dayIndex = (dayIndex + 1) % 7;
+    	            if (dayCount < 7) dayCount++;
+    	            }
+    	            float sum = 0;
+    	            for (int i=0; i<dayCount; i++) sum += dailyConsumption[i];
+    	            float avgConsumption = (dayCount > 0) ? sum/dayCount : 0;
+    	            status.remainingGas = (avgConsumption > 0.01f) ? sensor.weight/avgConsumption : 0;
+
+    	            //Copying sensor values
     	            status.humidity = sensor.humidity;
     	            status.temperature=sensor.temperature;
     	            status.weight = sensor.weight;
-    	            status.mq2_ppm=sensor.mq2_ppm;
-    	            status.mq4_ppm=sensor.mq4_ppm;
-    	            status.mq7_ppm=sensor.mq7_ppm;
     	            prevWeight = sensor.weight;
+
+    	            //Data is pushed to queues
     	            osMessagePut(StatusQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(ControlQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(CommQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(CompQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(LCDQueueHandle, (uint32_t)&status, 0);
-                    }
+
+    	            }
     }
   /* USER CODE END ProcessTask */
 }
@@ -742,7 +779,6 @@ void CommunicationTask(void const * argument)
   /* USER CODE BEGIN CommunicationTask */
 	osEvent evt;
 	    StatusData_t status;
-	    SensorData_t sensor;
 	    const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
 
 	/* Infinite loop */
@@ -761,7 +797,13 @@ void CommunicationTask(void const * argument)
 	  	       printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", status.temperature, status.humidity);
 	  	       }
 	  	       // Print status information like leak status,remaining number of days etc.
-	  	       printf("LeakType=%s, Remaining=%.1f kg, Compensated=%.2f kg\r\n",leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	       printf("LeakType=%s, Remaining Days=%.1f , Compensated=%.2f kg\r\n",leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	       if (status.anomalyFlag == 1)
+	  	    	   printf("Gas: LPG/Methane\r\n");
+	  	       else if (status.anomalyFlag == 2)
+	  	    	   printf("Gas: CO\r\n");
+	  	       else
+	  	    	   printf("Gas: Normal\r\n");
 	  	       osDelay(10000); // print every 10 seconds
 	          }
 
@@ -786,9 +828,10 @@ void CompensationTask(void const * argument)
   {
 	  evt = osMessageGet(CompQueueHandle, osWaitForever);
 	         if (evt.status == osEventMessage) {
-	        	 StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
-	        	 status = *statusPtr;
-	        	 status.compensatedGas = status.remainingGas * (1.0f - (status.humidity * 0.001f));
+	        	 status = *(StatusData_t *)evt.value.p;
+
+	        	 float humidityFactor = 1.0f - (status.humidity * 0.001f);
+	        	 float tempFactor     = 1.0f - (status.temperature - 25.0f) * 0.01f;
 	         }
   }
 
@@ -808,7 +851,6 @@ void lcd(void const * argument)
 	osEvent evt;
 	osEvent evtSensor;
 	StatusData_t status;
-	SensorData_t sensor;
 	const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
 	char line1[17];
 	char line2[17];
@@ -819,27 +861,36 @@ void lcd(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	          evt = osMessageGet(LCDQueueHandle,1000);
-	          if (evt.status == osEventMessage) {
-	          StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
-	          status=*statusPtr;
-	          }
-	          evtSensor=osMessageGet(SensorQueueHandle,0);
-	          if(evtSensor.status==osEventMessage){
-	          SensorData_t *sensorPtr=(SensorData_t *)evtSensor.value.p;
-	          sensor=*sensorPtr;
-	          }
-	          snprintf(line1, sizeof(line1), "W:%.1fkg T:%.1fC", status.weight, status.temperature);
-	          snprintf(line2, sizeof(line2), "L:%s H:%.1f%%", leakTypeStr[status.leakType], status.humidity);
-	          lcd_clear();
-	          lcd_set_cursor(0,0);
-	          lcd_send_string(line1);
-	          lcd_set_cursor(1,0);
-	          lcd_send_string(line2);
-              osDelay(2000);
+	  evt = osMessageGet(LCDQueueHandle, osWaitForever);
+	         if (evt.status == osEventMessage) {
+	             status = *(StatusData_t*)evt.value.p;
+	             // Screen 1: Weight + Temp + Leak
+	             snprintf(line1, sizeof(line1), "W:%.1fkg T:%.1fC", status.weight, status.temperature);
+	             snprintf(line2, sizeof(line2), "L:%s D:%.0f", leakTypeStr[status.leakType], status.remainingGas);
+	             lcd_clear();
+	             lcd_set_cursor(0,0);
+	             lcd_send_string(line1);
+	             lcd_set_cursor(1,0);
+	             lcd_send_string(line2);
+	             osDelay(2000);
+	             // Screen 2: Humidity + Compensated Gas
+	             snprintf(line1, sizeof(line1), "H:%.1f%%", status.humidity);
+	             snprintf(line2, sizeof(line2), "Comp:%.1fkg", status.compensatedGas);
+	             lcd_clear();
+	             lcd_set_cursor(0,0);
+	             lcd_send_string(line1);
+	             lcd_set_cursor(1,0);
+	             lcd_send_string(line2);
+	             osDelay(2000);
+	             // Screen 3: Gas Identification
+	             if (status.anomalyFlag == 1)
+	            	 snprintf (line1, sizeof(line1), "Gas: LPG/Meth");
+	             else if (status.anomalyFlag == 2)
+	            	 snprintf(line1, sizeof(line1), "Gas: CO");
+	             else snprintf(line1, sizeof(line1), "Gas: Normal");
+	         }
 
-     }
-
+  }
   /* USER CODE END lcd */
 }
 
