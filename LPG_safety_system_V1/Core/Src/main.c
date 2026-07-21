@@ -536,6 +536,9 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -551,6 +554,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB0 */
@@ -748,11 +758,11 @@ void ControlTask(void const * argument)
 	              switch (status.leakType) {
 	                  case LEAK_SUDDEN:
 	                      // closeValve();
-	                      // soundBuzzer();
+	                       soundBuzzer();
 	                      break;
 
 	                  case LEAK_SLOW:
-	                      // soundBuzzer();
+	                       soundBuzzer();
 	                      break;
 
 	                  case LEAK_NORMAL:
@@ -804,7 +814,7 @@ void CommunicationTask(void const * argument)
 	  	    	   printf("Gas: CO\r\n");
 	  	       else
 	  	    	   printf("Gas: Normal\r\n");
-	  	       osDelay(10000); // print every 10 seconds
+	  	       osDelay(1000); // print every 10 seconds
 	          }
 
 

@@ -2,7 +2,8 @@ import serial
 import matplotlib.pyplot as plt
 import time
 
-ser = serial.Serial('COM3', 115200, timeout=1)  # adjust COM port & baud rate
+# Adjust COM port and baud rate as needed
+ser = serial.Serial('COM3', 115200, timeout=1)
 
 mq2_ppm, mq4_ppm, mq7_ppm = [], [], []
 timestamps = []
@@ -16,25 +17,31 @@ while True:
         print(line)  # debug print
         current_time = time.time()
 
-        if line.startswith("MQ2:"):
+        if line.startswith("MQ2 sensor"):
             try:
-                ppm = float(line.split("PPM=")[1])
+                ppm = float(line.split("=")[1])
                 mq2_ppm.append(ppm)
                 timestamps.append(current_time)
             except:
                 pass
 
-        elif line.startswith("MQ4:"):
+        elif line.startswith("MQ4 sensor"):
             try:
-                ppm = float(line.split("PPM=")[1])
+                ppm = float(line.split("=")[1])
                 mq4_ppm.append(ppm)
+                # align with same timestamp list
+                if len(timestamps) > len(mq4_ppm):
+                    mq4_ppm.append(ppm)
             except:
                 pass
 
-        elif line.startswith("MQ7:"):
+        elif line.startswith("MQ7 sensor"):
             try:
-                ppm = float(line.split("PPM=")[1])
+                ppm = float(line.split("=")[1])
                 mq7_ppm.append(ppm)
+                # align with same timestamp list
+                if len(timestamps) > len(mq7_ppm):
+                    mq7_ppm.append(ppm)
             except:
                 pass
 
