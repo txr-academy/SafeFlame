@@ -29,6 +29,7 @@
 #include "dht22.h"
 #include "actuator.h"
 #include"LCD.h"
+#include"GSM.h"
 #include "stm32f4xx_hal.h"
 #include<stdio.h>
 
@@ -80,9 +81,11 @@ typedef struct {
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c2;
 
+UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
@@ -94,28 +97,31 @@ osThreadId myTask04Handle;
 osThreadId myTask05Handle;
 osThreadId myTask06Handle;
 osThreadId myTask07Handle;
+osThreadId myTask08Handle;
 osMessageQId SensorQueueHandle;
 osMessageQId StatusQueueHandle;
 osMessageQId ControlQueueHandle;
 osMessageQId CommQueueHandle;
 osMessageQId CompQueueHandle;
 osMessageQId LCDQueueHandle;
+osMessageQId GSMQueueHandle;
 /* USER CODE BEGIN PV */
 
 /*----------------- HX711 calibration values (temporary)----------------------*/
 volatile long offset = 0;             // tare offset (baseline)
 volatile float factor = 0.00005f;     // ready-made calibration factor
 
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_I2C2_Init(void);
+static void MX_USART2_UART_Init(void);
 void StartDefaultTask(void const * argument);
 void SensorTask(void const * argument);
 void ProcessTask(void const * argument);
@@ -123,6 +129,7 @@ void ControlTask(void const * argument);
 void CommunicationTask(void const * argument);
 void CompensationTask(void const * argument);
 void lcd(void const * argument);
+void GSM(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -200,10 +207,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
  // I2C_Scanner();   // Function call to identify slave address.
@@ -218,7 +227,6 @@ printf("********************************************\r\n");
 printf("*          System Started                  * \r\n");
 printf("*                                          * \r\n");
 printf("********************************************\r\n");
-
 
   /* USER CODE END 2 */
 
@@ -259,6 +267,10 @@ printf("********************************************\r\n");
   osMessageQDef(LCDQueue, 8, uint32_t);
   LCDQueueHandle = osMessageCreate(osMessageQ(LCDQueue), NULL);
 
+  /* definition and creation of GSMQueue */
+  osMessageQDef(GSMQueue, 16, uint32_t);
+  GSMQueueHandle = osMessageCreate(osMessageQ(GSMQueue), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -291,6 +303,10 @@ printf("********************************************\r\n");
   /* definition and creation of myTask07 */
   osThreadDef(myTask07, lcd, osPriorityNormal, 0, 256);
   myTask07Handle = osThreadCreate(osThread(myTask07), NULL);
+
+  /* definition and creation of myTask08 */
+  osThreadDef(myTask08, GSM, osPriorityRealtime, 0, 128);
+  myTask08Handle = osThreadCreate(osThread(myTask08), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -447,6 +463,39 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -511,6 +560,22 @@ static void MX_USB_OTG_FS_PCD_Init(void)
   /* USER CODE BEGIN USB_OTG_FS_Init 2 */
 
   /* USER CODE END USB_OTG_FS_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
@@ -730,6 +795,7 @@ void ProcessTask(void const * argument)
     	            osMessagePut(CommQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(CompQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(LCDQueueHandle, (uint32_t)&status, 0);
+    	            osMessagePut(GSMQueueHandle, (uint32_t)&status, 0);
 
     	            }
     }
@@ -788,14 +854,18 @@ void CommunicationTask(void const * argument)
 {
   /* USER CODE BEGIN CommunicationTask */
 	osEvent evt;
-	    StatusData_t status;
-	    const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
+    StatusData_t status;
+    uint8_t *gsmMsg;
+	const char* leakTypeStr[] = {"Normal", "Slow", "Sudden"};
 
 	/* Infinite loop */
   for(;;)
   {
 	  evt = osMessageGet(CommQueueHandle, osWaitForever);
 	  	       if (evt.status == osEventMessage) {
+	  	       //char *msg = (char*)evt.value.p;
+	  	       gsmMsg=(uint8_t*)evt.value.p;
+	  	       printf("GSM Response: %s\r\n", gsmMsg);
 	  	       StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
 	  	       status = *statusPtr;
 
@@ -814,6 +884,12 @@ void CommunicationTask(void const * argument)
 	  	    	   printf("Gas: CO\r\n");
 	  	       else
 	  	    	   printf("Gas: Normal\r\n");
+	  	     // Handle GSM replies
+	  	             evt = osMessageGet(GSMQueueHandle, 0); // non-blocking
+	  	             if (evt.status == osEventMessage) {
+	  	                 gsmMsg = (uint8_t*)evt.value.p;
+	  	                 printf("GSM Response: %s\r\n", gsmMsg);
+	  	             }
 	  	       osDelay(1000); // print every 10 seconds
 	          }
 
@@ -902,6 +978,48 @@ void lcd(void const * argument)
 
   }
   /* USER CODE END lcd */
+}
+
+/* USER CODE BEGIN Header_GSM */
+/**
+* @brief Function implementing the myTask08 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_GSM */
+void GSM(void const * argument)
+{
+  /* USER CODE BEGIN GSM */
+	osEvent evt;
+	StatusData_t *status;
+	uint8_t gsmBuf[128];
+  /* Infinite loop */
+  for(;;)
+  {
+	  evt = osMessageGet(GSMQueueHandle, osWaitForever);
+	         if (evt.status == osEventMessage) {
+	             status = (StatusData_t*)evt.value.p;
+
+	             // Decide what to send
+	             if (status->leakType == LEAK_SUDDEN) {
+	                 GSM_SendSMS("+919446026829", "ALERT: Sudden LPG leak detected!");
+	             }
+	             else if (status->leakType == LEAK_SLOW) {
+	                 GSM_SendSMS("+919446026829", "Warning: Slow leak detected.");
+	             }
+	             else if (status->anomalyFlag == 2) {
+	                 GSM_SendSMS("+919446026829", "Danger: CO detected!");
+	             }
+	// After sending, read GSM reply
+   if (HAL_UART_Receive(&huart2, gsmBuf, sizeof(gsmBuf), 5000) == HAL_OK) {
+
+// Forward to CommQueue so CommunicationTask can print it
+osMessagePut(CommQueueHandle, (uint32_t)gsmBuf, 0);
+	      }
+	   }
+    osDelay(2000);
+  }
+  /* USER CODE END GSM */
 }
 
 /**

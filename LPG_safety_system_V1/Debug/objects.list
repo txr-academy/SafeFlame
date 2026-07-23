@@ -1,3 +1,4 @@
+"./Core/Src/GSM.o"
 "./Core/Src/LCD.o"
 "./Core/Src/actuator.o"
 "./Core/Src/dht22.o"
