@@ -1,1 +1,5 @@
-../Core/Src/GSM.c:12:6:GSM_SendSMS	1
+../Core/Src/GSM.c:17:13:GSM_SendRaw	1
+../Core/Src/GSM.c:22:13:GSM_ReadResponse	2
+../Core/Src/GSM.c:38:6:GSM_Init	1
+../Core/Src/GSM.c:44:6:GSM_SendCommand	1
+../Core/Src/GSM.c:50:6:GSM_SendSMS	3

@@ -67,6 +67,7 @@ typedef struct {
 } StatusData_t;
 
 
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -139,7 +140,7 @@ int __io_putchar(int ch)
      HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
      return ch;
  }
-
+//-----------------------------------------------------------------------------------//
 
 
 /* USER CODE END PFP */
@@ -157,6 +158,9 @@ int _write(int file, char *ptr, int len)
 	return len;
 }
 */
+//-----------------------------------------------------------------------------//
+
+
 /*-------------------I2C scanner code-----------------------------------------*/
 /*
 void I2C_Scanner(void) {
@@ -169,6 +173,7 @@ void I2C_Scanner(void) {
     printf("I2C scan complete.\r\n");
 }
 */
+//----------------------------------------------------------------------------//
 
 /* USER CODE END 0 */
 
@@ -219,7 +224,7 @@ int main(void)
   HX711_Init();
   lcd_init();
 
-  /*---------------------- HX711 tare offset (empty load cell)----------------*/
+/*---------------------- HX711 tare offset (empty load cell)----------------*/
 offset = HX711_Tare(20);   // average of 20 samples
 factor = 0.00005f;// Use ready-made calibration factor for now
 /*----------------------------------------------------------------------------*/
@@ -227,6 +232,9 @@ printf("********************************************\r\n");
 printf("*          System Started                  * \r\n");
 printf("*                                          * \r\n");
 printf("********************************************\r\n");
+
+
+
 
   /* USER CODE END 2 */
 
@@ -313,6 +321,8 @@ printf("********************************************\r\n");
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
+
+
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
@@ -478,7 +488,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -698,7 +708,7 @@ void SensorTask(void const * argument)
   {
 
 	  // HX711 (wait for DOUT low handled inside HX711_Read)
-	 	         data.hx711_value = HX711_Read();
+	 	        /* data.hx711_value = HX711_Read();
 	 	         data.weight = HX711_GetWeight(offset, factor);
 
 	 	         //MQ2
@@ -715,7 +725,7 @@ void SensorTask(void const * argument)
 
 	 	          // DHT22
 	              if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK)
-
+*/
 	 	          // Push sensor packet into queue
 	 	          osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
 	              osDelay(1000); // print/update every 1 second
@@ -744,6 +754,7 @@ void ProcessTask(void const * argument)
     /* Infinite loop */
     for(;;)
     {
+
     	            evt = osMessageGet(SensorQueueHandle, osWaitForever);
     	            if (evt.status == osEventMessage) {
     	        	sensor= *(SensorData_t *)evt.value.p;
@@ -814,9 +825,11 @@ void ControlTask(void const * argument)
   /* USER CODE BEGIN ControlTask */
 	osEvent evt;
     StatusData_t status;
+
   /* Infinite loop */
   for(;;)
   {
+
 	  evt = osMessageGet(ControlQueueHandle,osWaitForever);
 	          if (evt.status == osEventMessage) {
 	          StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
@@ -861,6 +874,7 @@ void CommunicationTask(void const * argument)
 	/* Infinite loop */
   for(;;)
   {
+
 	  evt = osMessageGet(CommQueueHandle, osWaitForever);
 	  	       if (evt.status == osEventMessage) {
 	  	       //char *msg = (char*)evt.value.p;
@@ -885,11 +899,11 @@ void CommunicationTask(void const * argument)
 	  	       else
 	  	    	   printf("Gas: Normal\r\n");
 	  	     // Handle GSM replies
-	  	             evt = osMessageGet(GSMQueueHandle, 0); // non-blocking
-	  	             if (evt.status == osEventMessage) {
-	  	                 gsmMsg = (uint8_t*)evt.value.p;
-	  	                 printf("GSM Response: %s\r\n", gsmMsg);
-	  	             }
+	  	       evt = osMessageGet(GSMQueueHandle, 0); // non-blocking
+	  	       if (evt.status == osEventMessage) {
+	  	       gsmMsg = (uint8_t*)evt.value.p;
+	  	       printf("GSM Response: %s\r\n", gsmMsg);
+	  	       }
 	  	       osDelay(1000); // print every 10 seconds
 	          }
 
@@ -918,7 +932,7 @@ void CompensationTask(void const * argument)
 
 	        	 float humidityFactor = 1.0f - (status.humidity * 0.001f);
 	        	 float tempFactor     = 1.0f - (status.temperature - 25.0f) * 0.01f;
-	         }
+	  }
   }
 
   /* USER CODE END CompensationTask */
@@ -947,7 +961,7 @@ void lcd(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-	  evt = osMessageGet(LCDQueueHandle, osWaitForever);
+	         evt = osMessageGet(LCDQueueHandle, osWaitForever);
 	         if (evt.status == osEventMessage) {
 	             status = *(StatusData_t*)evt.value.p;
 	             // Screen 1: Weight + Temp + Leak
@@ -990,34 +1004,17 @@ void lcd(void const * argument)
 void GSM(void const * argument)
 {
   /* USER CODE BEGIN GSM */
-	osEvent evt;
-	StatusData_t *status;
-	uint8_t gsmBuf[128];
+	 GSM_Init();
   /* Infinite loop */
   for(;;)
   {
-	  evt = osMessageGet(GSMQueueHandle, osWaitForever);
-	         if (evt.status == osEventMessage) {
-	             status = (StatusData_t*)evt.value.p;
+	  // Simple test: send AT and expect OK
+	          GSM_SendCommand("AT\r\n");
+	          osDelay(5000);
 
-	             // Decide what to send
-	             if (status->leakType == LEAK_SUDDEN) {
-	                 GSM_SendSMS("+919446026829", "ALERT: Sudden LPG leak detected!");
-	             }
-	             else if (status->leakType == LEAK_SLOW) {
-	                 GSM_SendSMS("+919446026829", "Warning: Slow leak detected.");
-	             }
-	             else if (status->anomalyFlag == 2) {
-	                 GSM_SendSMS("+919446026829", "Danger: CO detected!");
-	             }
-	// After sending, read GSM reply
-   if (HAL_UART_Receive(&huart2, gsmBuf, sizeof(gsmBuf), 5000) == HAL_OK) {
-
-// Forward to CommQueue so CommunicationTask can print it
-osMessagePut(CommQueueHandle, (uint32_t)gsmBuf, 0);
-	      }
-	   }
-    osDelay(2000);
+	          // Example SMS trigger
+	          GSM_SendSMS("+919207436470", "Alert from STM32");
+    osDelay(1000);
   }
   /* USER CODE END GSM */
 }

@@ -1,18 +1,24 @@
 /*
- * GSM.h
+ * gsm.h
  *
- *  Created on: Jul 23, 2026
- *      Author:Rithika
+ * GSM driver header for STM32 + SIM800L
+ * Author: Rithika
  */
-#ifndef __GSM_H
-#define __GSM_H
-#include "cmsis_os.h"
+
+#ifndef INC_GSM_H_
+#define INC_GSM_H_
 #include "stm32f4xx_hal.h"
-
-// Queue handle for GSM task
+#include "cmsis_os.h"
 extern osMessageQId GSMQueueHandle;
-void GSM_SendSMS(char *number, char *message);
-
-#endif /* __GSM_H */
 
 
+// Initialize GSM module (disable echo, basic setup)
+void GSM_Init(void);
+
+// Send a generic AT command and print response
+void GSM_SendCommand(const char *cmd);
+
+// Send an SMS to the given number with the given message
+void GSM_SendSMS(const char *number, const char *message);
+
+#endif /* INC_GSM_H_ */
