@@ -174,6 +174,8 @@ void I2C_Scanner(void) {
 }
 */
 //----------------------------------------------------------------------------//
+UART_HandleTypeDef huart2; // adjust to your UART instance
+
 
 /* USER CODE END 0 */
 
@@ -219,22 +221,18 @@ int main(void)
   MX_I2C2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
  // I2C_Scanner();   // Function call to identify slave address.
   HX711_Init();
   lcd_init();
 
 /*---------------------- HX711 tare offset (empty load cell)----------------*/
 offset = HX711_Tare(20);   // average of 20 samples
-factor = 0.00005f;// Use ready-made calibration factor for now
+factor = 0.00005f;// (known weight)/(raw -offset)
 /*----------------------------------------------------------------------------*/
 printf("********************************************\r\n");
 printf("*          System Started                  * \r\n");
 printf("*                                          * \r\n");
 printf("********************************************\r\n");
-
-
-
 
   /* USER CODE END 2 */
 
@@ -321,8 +319,6 @@ printf("********************************************\r\n");
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
-
-
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
@@ -488,7 +484,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -707,8 +703,8 @@ void SensorTask(void const * argument)
   for(;;)
   {
 
-	  // HX711 (wait for DOUT low handled inside HX711_Read)
-	 	        /* data.hx711_value = HX711_Read();
+	  //HX711 (wait for DOUT low handled inside HX711_Read)
+	 	         data.hx711_value = HX711_Read();
 	 	         data.weight = HX711_GetWeight(offset, factor);
 
 	 	         //MQ2
@@ -725,8 +721,8 @@ void SensorTask(void const * argument)
 
 	 	          // DHT22
 	              if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK)
-*/
-	 	          // Push sensor packet into queue
+
+	 	          // Push sensor packet into sensor queue
 	 	          osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
 	              osDelay(1000); // print/update every 1 second
 
@@ -744,51 +740,72 @@ void SensorTask(void const * argument)
 void ProcessTask(void const * argument)
 {
   /* USER CODE BEGIN ProcessTask */
-	    osEvent evt;
-	    SensorData_t sensor;
-	    static float prevWeight = 12.0f;
-	    static StatusData_t status;
-	    static float dailyConsumption[7]={0};
-	    static int dayIndex=0,dayCount=0;
+	   osEvent evt;
+	   SensorData_t sensor;
+	   static float prevWeight;
+	   static StatusData_t status;
+	   static float dailyConsumption[7]={0};
+	   static int dayIndex=0,dayCount=0;
 
     /* Infinite loop */
     for(;;)
     {
+      evt = osMessageGet(SensorQueueHandle, osWaitForever);
+      if (evt.status == osEventMessage) {
+      sensor= *(SensorData_t *)evt.value.p;
+      if (prevWeight == 0.0f) {
+                  prevWeight = sensor.weight;
+              }
+     // Leak classification
+      float deltaW = sensor.weight - prevWeight;
+     // float rate = deltaW / 0.5f; // per 0.5s sample
+     /*
+      if (rate < -2.0f) status.leakType = LEAK_SUDDEN;
+      else if (rate < -0.2f) status.leakType = LEAK_SLOW;
+      else status.leakType = LEAK_NORMAL;
+      */
+      if (sensor.mq2_ppm > 50 || sensor.mq4_ppm > 50 || sensor.mq7_ppm > 20) {
+    	  //inner if loop is added to check for sudden leaks
+          if (sensor.mq2_ppm > 100 || sensor.mq4_ppm > 100 || sensor.mq7_ppm > 100){
+              status.leakType = LEAK_SUDDEN;
+          } else
+              status.leakType = LEAK_SLOW;
+      } else {
+          status.leakType = LEAK_NORMAL;
+      }
 
-    	            evt = osMessageGet(SensorQueueHandle, osWaitForever);
-    	            if (evt.status == osEventMessage) {
-    	        	sensor= *(SensorData_t *)evt.value.p;
-    	            // Leak classification
-    	            float deltaW = sensor.weight - prevWeight;
-    	            float rate = deltaW / 0.5f; // per 0.5s sample
-    	            if (rate < -2.0f) status.leakType = LEAK_SUDDEN;
-    	            else if (rate < -0.2f) status.leakType = LEAK_SLOW;
-    	            else status.leakType = LEAK_NORMAL;
+      //Gas identification-this block is implemented to identify which gas is dominant based on sensor combinations
+      if(sensor.mq2_ppm>50 && sensor.mq4_ppm>50)
+      status.anomalyFlag=1;//LPG or methane
+      else if (sensor.mq7_ppm >50 && sensor.mq2_ppm>50)
+      status.anomalyFlag=2;//carbon monoxide
+      else
+      status.anomalyFlag=0;//Normal
+      // Compensation factors
+      float tempFactor     = 1.0f - (sensor.temperature - 25.0f) * 0.01f;
+      float humidityFactor = 1.0f - (sensor.humidity - 40.0f) * 0.001f;
+      status.compensatedGas = sensor.weight * tempFactor * humidityFactor;
 
-    	            //Gas identification
-    	            if(sensor.mq2_ppm>200 && sensor.mq4_ppm>200)
-    	                status.anomalyFlag=1;
-    	            else if (sensor.mq7_ppm >100 && sensor.mq2_ppm>200)
-    	            	status.anomalyFlag=2;
-    	            else
-    	            	status.anomalyFlag=0;
-    	            // Compensation factors
-    	            float tempFactor     = 1.0f - (sensor.temperature - 25.0f) * 0.01f;
-    	            float humidityFactor = 1.0f - (sensor.humidity - 40.0f) * 0.001f;
+      // Apply compensation to sensor curves (ppm values)
 
-    	            // Apply compensation to sensor curves (ppm values)
-    	            status.mq2_ppm = MQ2_GetPPM(sensor.mq2_value) * tempFactor * humidityFactor;
-    	            status.mq4_ppm = MQ4_GetPPM(sensor.mq4_value) * tempFactor * humidityFactor;
-    	            status.mq7_ppm = MQ7_GetPPM(sensor.mq7_value) * tempFactor * humidityFactor;
+      status.mq2_ppm = MQ2_GetPPM(sensor.mq2_value) * tempFactor * humidityFactor;
+      status.mq4_ppm = MQ4_GetPPM(sensor.mq4_value) * tempFactor * humidityFactor;
+      status.mq7_ppm = MQ7_GetPPM(sensor.mq7_value) * tempFactor * humidityFactor;
 
-    	            // Prediction
+      // Prediction of remaining days based on user usage pattern
 
     	            float consumedToday = prevWeight - sensor.weight;
-    	            if (consumedToday > 0.1f) {
+ /*if the consumed gas is greater than 100 grams the consumed quantity
+  is stored within daily consumption buffer with 7 elements corresponding to 7 days*/
+    	            if (consumedToday > 0.1f)
+    	            {
     	            dailyConsumption[dayIndex] = consumedToday;
     	            dayIndex = (dayIndex + 1) % 7;
     	            if (dayCount < 7) dayCount++;
     	            }
+/* Adds up all stored daily consumption values,then divide by number of days to
+ * calculate average consumption.based on the computed average value remaining
+ * number of days is calculated */
     	            float sum = 0;
     	            for (int i=0; i<dayCount; i++) sum += dailyConsumption[i];
     	            float avgConsumption = (dayCount > 0) ? sum/dayCount : 0;
@@ -800,7 +817,7 @@ void ProcessTask(void const * argument)
     	            status.weight = sensor.weight;
     	            prevWeight = sensor.weight;
 
-    	            //Data is pushed to queues
+    	            //Data is broadcasted to queues
     	            osMessagePut(StatusQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(ControlQueueHandle, (uint32_t)&status, 0);
     	            osMessagePut(CommQueueHandle, (uint32_t)&status, 0);
@@ -833,7 +850,7 @@ void ControlTask(void const * argument)
 	  evt = osMessageGet(ControlQueueHandle,osWaitForever);
 	          if (evt.status == osEventMessage) {
 	          StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
-	       	  status = *statusPtr;   // copy into local struct
+	       	  status = *statusPtr;
 	              switch (status.leakType) {
 	                  case LEAK_SUDDEN:
 	                      // closeValve();
@@ -845,7 +862,7 @@ void ControlTask(void const * argument)
 	                      break;
 
 	                  case LEAK_NORMAL:
-	                      // No action
+	                      // No action required
 	                      break;
                   }
 	          }
@@ -874,37 +891,38 @@ void CommunicationTask(void const * argument)
 	/* Infinite loop */
   for(;;)
   {
-
 	  evt = osMessageGet(CommQueueHandle, osWaitForever);
 	  	       if (evt.status == osEventMessage) {
 	  	       //char *msg = (char*)evt.value.p;
 	  	       gsmMsg=(uint8_t*)evt.value.p;
-	  	       printf("GSM Response: %s\r\n", gsmMsg);
+	  	      // printf("GSM Response: %s\r\n", gsmMsg);
 	  	       StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
 	  	       status = *statusPtr;
 
 	  	       // Fetch the latest sensor data from bundled status queue
-	  	       printf("HX711 Weight=%.2f kg\r\n",status.weight);
-	  	       printf("MQ2 sensor PPM =%.2f\r\n",status.mq2_ppm);
-	  	       printf("MQ4 sensor PPM =%.2f\r\n",status.mq4_ppm);
-	  	       printf("MQ7 sensor PPM =%.2f\r\n",status.mq7_ppm);
-	  	       printf("DHT22: Temp=%.1f °C, Hum=%.1f %%\r\n", status.temperature, status.humidity);
+	  	       printf("Cylinder Weight=%.2f kg\r\n",status.weight);
+	  	       printf("LPG concentration in PPM =%.2f\r\n",status.mq2_ppm);
+	  	       printf("Methane concentration in PPM =%.2f\r\n",status.mq4_ppm);
+	  	       printf("CO concentration in PPM =%.2f\r\n",status.mq7_ppm);
+	  	       printf("Temperature =%.1f °C, Humidity=%.1f %%\r\n", status.temperature, status.humidity);
 	  	       }
 	  	       // Print status information like leak status,remaining number of days etc.
-	  	       printf("LeakType=%s, Remaining Days=%.1f , Compensated=%.2f kg\r\n",leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	       printf("Leak Type=%s, Remaining number of Days=%.1f , Compensated=%.2f kg\r\n",leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
 	  	       if (status.anomalyFlag == 1)
-	  	    	   printf("Gas: LPG/Methane\r\n");
+	  	    	   printf("Status: LPG/ Methane detected!\r\n");
 	  	       else if (status.anomalyFlag == 2)
-	  	    	   printf("Gas: CO\r\n");
+	  	    	   printf("Status: CO detected!\r\n");
 	  	       else
-	  	    	   printf("Gas: Normal\r\n");
+	  	    	   printf("Status: Normal\r\n");
 	  	     // Handle GSM replies
+	  	       /*
 	  	       evt = osMessageGet(GSMQueueHandle, 0); // non-blocking
 	  	       if (evt.status == osEventMessage) {
 	  	       gsmMsg = (uint8_t*)evt.value.p;
 	  	       printf("GSM Response: %s\r\n", gsmMsg);
 	  	       }
 	  	       osDelay(1000); // print every 10 seconds
+	  	       */
 	          }
 
 
@@ -1005,17 +1023,58 @@ void GSM(void const * argument)
 {
   /* USER CODE BEGIN GSM */
 	 GSM_Init();
-  /* Infinite loop */
-  for(;;)
-  {
-	  // Simple test: send AT and expect OK
-	          GSM_SendCommand("AT\r\n");
-	          osDelay(5000);
+	 osEvent evt;
+	 StatusData_t status;
+	 GSM_Init();
 
-	          // Example SMS trigger
-	          GSM_SendSMS("+919207436470", "Alert from STM32");
-    osDelay(1000);
-  }
+  /* Infinite loop */
+	 for(;;)
+	   {
+		 evt = osMessageGet(GSMQueueHandle, osWaitForever);
+
+		         if (evt.status == osEventMessage)
+		         {
+		             status = *(StatusData_t *)evt.value.p;
+		             if (status.leakType == LEAK_SUDDEN||status.leakType==LEAK_SLOW||status.leakType==LEAK_NORMAL)
+		             {
+		                 printf("\r\n*** SUDDEN LEAK DETECTED ***\r\n");
+		                 printf("Sending GSM alert...\r\n");
+
+		                 GSM_SendLeakAlert(&status);
+
+		                 printf("GSM alert processing completed.\r\n");
+		             }
+		         }
+		     }
+//debug code for AT command response check
+		  /*
+		        HAL_UART_Transmit(&huart2,
+		                          (uint8_t *)cmd,
+		                          strlen(cmd),
+		                          1000);
+
+		        while (HAL_UART_Receive(&huart2, &rx, 1, 1000) == HAL_OK)
+		        {
+		            HAL_UART_Transmit(&huart3 &rx,1, 1000);
+		        }
+
+		        osDelay(2000);
+	   }
+	 */
+	     // Wait for leak status from ProcessTask
+		 /*
+	     evt = osMessageGet(StatusQueueHandle, osWaitForever);
+	     if (evt.status == osEventMessage) {
+	       status = *(StatusData_t*)evt.value.p;
+
+	       // Only send SMS if leak detected
+	       if (status.leakType == LEAK_SLOW || status.leakType == LEAK_SUDDEN) {
+	       GSM_SendLeakAlert(&status);
+	       }
+	     }
+	     osDelay(1000);
+	   }
+	   */
   /* USER CODE END GSM */
 }
 

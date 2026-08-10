@@ -4,78 +4,314 @@
  * GSM driver for STM32 + SIM800L
  * Author: Rithika
  */
-
 #include "gsm.h"
+#include "main.h"
+#include "cmsis_os.h"
 #include "string.h"
 #include "stdio.h"
+#include "stdint.h"
+#include"status.h"
 
-extern UART_HandleTypeDef huart2; // GSM UART
-extern UART_HandleTypeDef huart3; // Debug UART
+extern UART_HandleTypeDef huart2;   // SIM800L UART
+extern UART_HandleTypeDef huart3;   // Debug UART
 
-static uint8_t rxBuf[128];
+#define GSM_RX_BUFFER_SIZE    128
 
+static uint8_t gsm_rx_buffer[GSM_RX_BUFFER_SIZE];
+
+/*
+ * Send AT command to SIM800L
+ */
 static void GSM_SendRaw(const char *cmd)
 {
-    HAL_UART_Transmit(&huart2, (uint8_t*)cmd, strlen(cmd), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2,(uint8_t *)cmd, strlen(cmd), 1000);
 }
-
-static void GSM_ReadResponse(uint32_t timeout)
+static uint16_t GSM_ReadResponse(uint32_t timeout)
 {
-    memset(rxBuf, 0, sizeof(rxBuf));
-    if (HAL_UART_Receive(&huart2, rxBuf, sizeof(rxBuf), timeout) == HAL_OK) {
-        // Forward to debug UART
-        HAL_UART_Transmit(&huart3, rxBuf, strlen((char*)rxBuf), HAL_MAX_DELAY);
-
-        // Also push into GSMQueue for CommunicationTask
-        osMessagePut(GSMQueueHandle, (uint32_t)rxBuf, 0);
-    } else {
-        const char *msg = "No GSM reply\r\n";
-        HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-        osMessagePut(GSMQueueHandle, (uint32_t)msg, 0);
-    }
-}
-
-void GSM_Init(void)
-{
-    GSM_SendRaw("ATE0\r\n");   // Disable echo
-    GSM_ReadResponse(2000);
-}
-
-void GSM_SendCommand(const char *cmd)
-{
-    GSM_SendRaw(cmd);
-    GSM_ReadResponse(2000);
-}
-
-void GSM_SendSMS(const char *number, const char *message)
-{
-    char cmd[64];
-    uint8_t ctrlZ = 0x1A;
-
-    // Set SMS text mode
-    GSM_SendCommand("AT+CMGF=1\r\n");
-    HAL_Delay(500);
-
-    // Send recipient number
-    sprintf(cmd, "AT+CMGS=\"%s\"\r\n", number);
-    GSM_SendRaw(cmd);
-
-    // Wait for '>' prompt
     uint8_t ch;
-    while (1) {
-        if (HAL_UART_Receive(&huart2, &ch, 1, 5000) == HAL_OK) {
-            HAL_UART_Transmit(&huart3, &ch, 1, HAL_MAX_DELAY); // debug
-            if (ch == '>') break;
+    uint16_t index = 0;
+    uint32_t start_time;
+
+    memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+
+    start_time = HAL_GetTick();
+
+    printf("\r\nGSM Response: ");
+
+    while ((HAL_GetTick() - start_time) < timeout)
+    {
+        if (HAL_UART_Receive(&huart2, &ch, 1, 100) == HAL_OK)
+        {
+            if (index < GSM_RX_BUFFER_SIZE - 1)
+            {
+                gsm_rx_buffer[index++] = ch;
+                gsm_rx_buffer[index] = '\0';
+            }
+            HAL_UART_Transmit(&huart3, &ch, 1, 100);
+            if (strstr((char *)gsm_rx_buffer, "OK") != NULL)
+            {
+                break;
+            }
+            if (strstr((char *)gsm_rx_buffer, "ERROR") != NULL)
+            {
+                break;
+            }
         }
     }
 
-    // Send message body
-    HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), HAL_MAX_DELAY);
+    printf("\r\n");
 
-    // End with Ctrl+Z
-    HAL_UART_Transmit(&huart2, &ctrlZ, 1, HAL_MAX_DELAY);
-
-    // Read final response
-    GSM_ReadResponse(5000);
+    return index;
 }
+void GSM_Init(void)
+{
+    const char *msg;
 
+    msg = "\r\n========== GSM INIT ==========\r\n";
+    HAL_UART_Transmit(&huart3,(uint8_t *)msg,strlen(msg),1000);
+    /*
+    GSM_SendCommand("AT+CPIN?\r\n");
+   	 osDelay(500);
+
+   	 GSM_SendCommand("AT+CREG?\r\n");
+   	 osDelay(500);
+
+   	 GSM_SendCommand("AT+CSQ\r\n");
+   	 osDelay(500);
+
+   	 GSM_SendCommand("AT+CMGF?\r\n");
+   	 osDelay(500);
+
+   	 GSM_SendCommand("AT+CSCA?\r\n");
+   	 osDelay(500);
+
+   	 GSM_SendCommand("AT+CMEE=2\r\n");
+   	 osDelay(500);
+
+    /*
+     * Disable command echo
+     */
+    GSM_SendRaw("ATE0\r\n");
+
+    memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+    GSM_ReadResponse(2000);
+    osDelay(500);
+
+    /*
+     * Set SMS text mode
+     */
+    GSM_SendRaw("AT+CMGF=1\r\n");
+
+    memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+    GSM_ReadResponse(2000);
+
+    osDelay(500);
+
+    /*
+     * Set GSM character set
+     */
+    GSM_SendRaw("AT+CSCS=\"GSM\"\r\n");
+
+    memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+    GSM_ReadResponse(2000);
+    osDelay(500);
+
+    /*
+     * Check network registration
+     */
+    GSM_SendRaw("AT+CREG?\r\n");
+
+    memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+    GSM_ReadResponse(3000);
+
+    msg = "\r\n========== GSM INIT DONE ==========\r\n";
+
+    HAL_UART_Transmit(&huart3, (uint8_t *)msg, strlen(msg), 1000);
+}
+/*
+ * Send an AT command and display response
+ */
+void GSM_SendCommand(const char *cmd)
+{
+ GSM_SendRaw(cmd);
+ memset(gsm_rx_buffer, 0, sizeof(gsm_rx_buffer));
+ GSM_ReadResponse(3000);
+}
+/*
+ * Send SMS
+ */
+void GSM_SendSMS(const char *number, const char *message)
+{
+    char cmd[64];
+    uint8_t ch;
+    uint8_t ctrlZ = 0x1A;
+    uint8_t prompt_received = 0;
+
+    printf("\r\n========== SMS START ==========\r\n");
+
+    /*--------------------------------------------------
+     * Flush any old data from USART2 RX
+     *--------------------------------------------------*/
+    while (HAL_UART_Receive(&huart2, &ch, 1, 10) == HAL_OK)
+    {
+        /* discard stale character */
+    }
+
+    /*--------------------------------------------------
+     * Set SMS text mode
+     *--------------------------------------------------*/
+    printf("Sending AT+CMGF=1...\r\n");
+
+    GSM_SendRaw("AT+CMGF=1\r\n");
+
+    GSM_ReadResponse(3000);
+
+    osDelay(1000);
+
+    /*--------------------------------------------------
+     * Flush RX again
+     *--------------------------------------------------*/
+    while (HAL_UART_Receive(&huart2, &ch, 1, 10) == HAL_OK)
+    {
+        /* discard stale character */
+    }
+
+    /*--------------------------------------------------
+     * Send CMGS command
+     *--------------------------------------------------*/
+    snprintf(cmd,
+             sizeof(cmd),
+             "AT+CMGS=\"%s\"\r",
+             number);
+
+    printf("Sending: %s\r\n", cmd);
+
+    GSM_SendRaw(cmd);
+
+    /*--------------------------------------------------
+     * Wait for >
+     *--------------------------------------------------*/
+
+    printf("Waiting for SMS prompt '>'...\r\n");
+
+    uint32_t start = HAL_GetTick();
+
+    while ((HAL_GetTick() - start) < 10000)
+    {
+        if (HAL_UART_Receive(&huart2,
+                             &ch,
+                             1,
+                             100) == HAL_OK)
+        {
+            /*
+             * Print every response character
+             */
+            HAL_UART_Transmit(&huart3,
+                              &ch,
+                              1,
+                              100);
+
+            if (ch == '>')
+            {
+                prompt_received = 1;
+                break;
+            }
+        }
+    }
+
+    /*--------------------------------------------------
+     * Check prompt
+     *--------------------------------------------------*/
+
+    if (!prompt_received)
+    {
+        printf("\r\nERROR: No '>' prompt from SIM800L\r\n");
+        printf("SMS NOT SENT\r\n");
+        printf("========== SMS END ==========\r\n");
+
+        return;
+    }
+
+    printf("\r\nSMS prompt received!\r\n");
+
+    /*--------------------------------------------------
+     * Send message
+     *--------------------------------------------------*/
+
+    printf("Sending SMS text...\r\n");
+
+    HAL_UART_Transmit(&huart2,
+                      (uint8_t *)message,
+                      strlen(message),
+                      5000);
+
+    osDelay(200);
+
+    /*--------------------------------------------------
+     * Send CTRL+Z
+     *--------------------------------------------------*/
+
+    printf("Sending CTRL+Z...\r\n");
+
+    HAL_UART_Transmit(&huart2,
+                      &ctrlZ,
+                      1,
+                      1000);
+
+    /*--------------------------------------------------
+     * Wait for final response
+     *--------------------------------------------------*/
+
+    printf("Waiting for SMS confirmation...\r\n");
+
+    GSM_ReadResponse(15000);
+
+    printf("\r\n========== SMS END ==========\r\n");
+}
+void GSM_SendLeakAlert(StatusData_t *status)
+{
+    char msg[160];
+    const char *leakTypeStr[] =
+    {
+        "Normal",
+        "Slow",
+        "Sudden"
+    };
+    const char *gasTypeStr;
+    if (status->anomalyFlag == 1)
+    {
+        gasTypeStr = "LPG/Methane";
+    }
+    else if (status->anomalyFlag == 2)
+    {
+        gasTypeStr = "CO";
+    }
+    else
+    {
+        gasTypeStr = "Unknown";
+    }
+
+    uint8_t leakType = status->leakType;
+
+    if (leakType > LEAK_SUDDEN)
+    {
+        leakType = LEAK_NORMAL;
+    }
+
+    snprintf(msg,
+             sizeof(msg),
+             "ALERT: Leak=%s, Gas=%s\r\n"
+             "MQ2=%.1f ppm\r\n"
+             "MQ4=%.1f ppm\r\n"
+             "MQ7=%.1f ppm",
+             leakTypeStr[leakType],
+             gasTypeStr,
+             status->mq2_ppm,
+             status->mq4_ppm,
+             status->mq7_ppm);
+
+    printf("\r\nSMS CONTENT:\r\n");
+    printf("%s\r\n", msg);
+
+    GSM_SendSMS("+919207436470", msg);
+}

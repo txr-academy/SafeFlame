@@ -40,7 +40,7 @@ long HX711_Read(void) {
     long value = 0;
 
     // Wait until DOUT goes low (data ready)
-   // while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0));
+   while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0));
     uint32_t start = HAL_GetTick();
 
     while(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0))
