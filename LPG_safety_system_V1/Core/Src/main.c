@@ -66,7 +66,7 @@ typedef struct {
     float mq2_ppm,mq4_ppm,mq7_ppm;
 } StatusData_t;
 
-
+//uint8_t rxBuf[128];
 
 /* USER CODE END PTD */
 
@@ -311,7 +311,7 @@ printf("********************************************\r\n");
   myTask07Handle = osThreadCreate(osThread(myTask07), NULL);
 
   /* definition and creation of myTask08 */
-  osThreadDef(myTask08, GSM, osPriorityRealtime, 0, 128);
+  osThreadDef(myTask08, GSM, osPriorityNormal, 0, 512);
   myTask08Handle = osThreadCreate(osThread(myTask08), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -704,7 +704,7 @@ void SensorTask(void const * argument)
   {
 
 	  //HX711 (wait for DOUT low handled inside HX711_Read)
-	 	         data.hx711_value = HX711_Read();
+	 	        data.hx711_value = HX711_Read();
 	 	         data.weight = HX711_GetWeight(offset, factor);
 
 	 	         //MQ2
@@ -893,21 +893,21 @@ void CommunicationTask(void const * argument)
   {
 	  evt = osMessageGet(CommQueueHandle, osWaitForever);
 	  	       if (evt.status == osEventMessage) {
-	  	       //char *msg = (char*)evt.value.p;
+	  	       char *msg = (char*)evt.value.p;
 	  	       gsmMsg=(uint8_t*)evt.value.p;
-	  	      // printf("GSM Response: %s\r\n", gsmMsg);
+	  	       printf("GSM Response: %s\r\n", gsmMsg);
 	  	       StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
 	  	       status = *statusPtr;
 
 	  	       // Fetch the latest sensor data from bundled status queue
-	  	       printf("Cylinder Weight=%.2f kg\r\n",status.weight);
-	  	       printf("LPG concentration in PPM =%.2f\r\n",status.mq2_ppm);
-	  	       printf("Methane concentration in PPM =%.2f\r\n",status.mq4_ppm);
-	  	       printf("CO concentration in PPM =%.2f\r\n",status.mq7_ppm);
-	  	       printf("Temperature =%.1f °C, Humidity=%.1f %%\r\n", status.temperature, status.humidity);
+	  	      printf("Cylinder Weight=%.2f kg\r\n",status.weight);
+	  	      printf("LPG concentration in PPM =%.2f\r\n",status.mq2_ppm);
+	  	      printf("Methane concentration in PPM =%.2f\r\n",status.mq4_ppm);
+	  	      printf("CO concentration in PPM =%.2f\r\n",status.mq7_ppm);
+	  	      printf("Temperature =%.1f °C, Humidity=%.1f %%\r\n", status.temperature, status.humidity);
 	  	       }
 	  	       // Print status information like leak status,remaining number of days etc.
-	  	       printf("Leak Type=%s, Remaining number of Days=%.1f , Compensated=%.2f kg\r\n",leakTypeStr[status.leakType], status.remainingGas, status.compensatedGas);
+	  	      printf("Leak Type=%s, Remaining number of Days=%.1f \r\n",leakTypeStr[status.leakType], status.remainingGas);
 	  	       if (status.anomalyFlag == 1)
 	  	    	   printf("Status: LPG/ Methane detected!\r\n");
 	  	       else if (status.anomalyFlag == 2)
@@ -915,14 +915,14 @@ void CommunicationTask(void const * argument)
 	  	       else
 	  	    	   printf("Status: Normal\r\n");
 	  	     // Handle GSM replies
-	  	       /*
+
 	  	       evt = osMessageGet(GSMQueueHandle, 0); // non-blocking
 	  	       if (evt.status == osEventMessage) {
 	  	       gsmMsg = (uint8_t*)evt.value.p;
 	  	       printf("GSM Response: %s\r\n", gsmMsg);
 	  	       }
 	  	       osDelay(1000); // print every 10 seconds
-	  	       */
+
 	          }
 
 
@@ -1022,7 +1022,6 @@ void lcd(void const * argument)
 void GSM(void const * argument)
 {
   /* USER CODE BEGIN GSM */
-	 GSM_Init();
 	 osEvent evt;
 	 StatusData_t status;
 	 GSM_Init();
@@ -1035,46 +1034,24 @@ void GSM(void const * argument)
 		         if (evt.status == osEventMessage)
 		         {
 		             status = *(StatusData_t *)evt.value.p;
-		             if (status.leakType == LEAK_SUDDEN||status.leakType==LEAK_SLOW||status.leakType==LEAK_NORMAL)
+		             if (status.leakType == LEAK_SUDDEN||status.leakType==LEAK_SLOW)
 		             {
 		                 printf("\r\n*** SUDDEN LEAK DETECTED ***\r\n");
 		                 printf("Sending GSM alert...\r\n");
-
 		                 GSM_SendLeakAlert(&status);
-
+		             }
+		             else if (status.leakType == LEAK_SLOW)
+		             {
+		                 printf("\r\n*** SLOW LEAK DETECTED ***\r\n");
+		                 printf("Sending GSM alert...\r\n");
+		                 GSM_SendLeakAlert(&status);
 		                 printf("GSM alert processing completed.\r\n");
 		             }
 		         }
-		     }
-//debug code for AT command response check
-		  /*
-		        HAL_UART_Transmit(&huart2,
-		                          (uint8_t *)cmd,
-		                          strlen(cmd),
-		                          1000);
 
-		        while (HAL_UART_Receive(&huart2, &rx, 1, 1000) == HAL_OK)
-		        {
-		            HAL_UART_Transmit(&huart3 &rx,1, 1000);
-		        }
+     }
 
-		        osDelay(2000);
-	   }
-	 */
-	     // Wait for leak status from ProcessTask
-		 /*
-	     evt = osMessageGet(StatusQueueHandle, osWaitForever);
-	     if (evt.status == osEventMessage) {
-	       status = *(StatusData_t*)evt.value.p;
 
-	       // Only send SMS if leak detected
-	       if (status.leakType == LEAK_SLOW || status.leakType == LEAK_SUDDEN) {
-	       GSM_SendLeakAlert(&status);
-	       }
-	     }
-	     osDelay(1000);
-	   }
-	   */
   /* USER CODE END GSM */
 }
 

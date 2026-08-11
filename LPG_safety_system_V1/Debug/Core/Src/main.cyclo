@@ -12,9 +12,9 @@
 ../Core/Src/main.c:697:6:SensorTask	2
 ../Core/Src/main.c:740:6:ProcessTask	18
 ../Core/Src/main.c:840:6:ControlTask	6
-../Core/Src/main.c:883:6:CommunicationTask	4
+../Core/Src/main.c:883:6:CommunicationTask	5
 ../Core/Src/main.c:939:6:CompensationTask	2
 ../Core/Src/main.c:966:6:lcd	4
 ../Core/Src/main.c:1022:6:GSM	5
-../Core/Src/main.c:1089:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:1107:6:Error_Handler	1
+../Core/Src/main.c:1066:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:1084:6:Error_Handler	1
