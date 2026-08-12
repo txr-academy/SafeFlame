@@ -9,11 +9,8 @@
 #include <math.h>
 #include <stdio.h>
 
-// Adjust RL to match your MQ4 module (often 5kΩ)
-#define MQ4_SUPPLY_VOLTAGE 3.3f   // use STM32 ADC reference
-#define MQ4_RL_VALUE       5.0f   // kΩ (check your board)
 
-static float MQ4_R0 = 1.0f;
+static float MQ4_R0 = 0.0f;
 
 uint32_t MQ4_ReadADC(void) {
     return Read_ADC_Channel(ADC_CHANNEL_12); // PC2 or whichever pin you wired
@@ -21,7 +18,7 @@ uint32_t MQ4_ReadADC(void) {
 
 float MQ4_GetPPM(uint32_t adc_val) {
     float v_out = ((float)adc_val / ADC_RES) * VREF;   // voltage at STM32 pin
-    float v_sensor = v_out * 1.0f;                     // no extra divider gain
+    float v_sensor = v_out * 1.0f;
 
     if (v_sensor <= 0.01f || MQ4_R0 <= 0.0f) return 0.0f;
 
@@ -42,7 +39,7 @@ float MQ4_CalibrateR0(void) {
     uint32_t avg_adc = sum / 100;
 
     float v_out = ((float)avg_adc / ADC_RES) * VREF;
-    float v_sensor = v_out * 1.0f; // no divider gain
+    float v_sensor = v_out * 1.0f;
 
     if (v_sensor <= 0.01f) {
         MQ4_R0 = 0.0f;

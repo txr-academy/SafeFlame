@@ -66,7 +66,7 @@ typedef struct {
     float mq2_ppm,mq4_ppm,mq7_ppm;
 } StatusData_t;
 
-//uint8_t rxBuf[128];
+
 
 /* USER CODE END PTD */
 
@@ -81,13 +81,19 @@ typedef struct {
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc1;//used to configure ADC1
 DMA_HandleTypeDef hdma_adc1;
+I2C_HandleTypeDef hi2c2;//LCD display
+UART_HandleTypeDef huart2;//GSM communication
+UART_HandleTypeDef huart3;//Debug terminal
+/*Compensation factors-------------------------------------------------*/
+volatile float g_mq2_threshold_low  = 50.0f;
+volatile float g_mq4_threshold_low  = 50.0f;
+volatile float g_mq7_threshold_low  = 20.0f;
+volatile float g_mq2_threshold_high = 100.0f;
+volatile float g_mq4_threshold_high = 100.0f;
+volatile float g_mq7_threshold_high = 100.0f;
 
-I2C_HandleTypeDef hi2c2;
-
-UART_HandleTypeDef huart2;
-UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -174,7 +180,7 @@ void I2C_Scanner(void) {
 }
 */
 //----------------------------------------------------------------------------//
-UART_HandleTypeDef huart2; // adjust to your UART instance
+
 
 
 /* USER CODE END 0 */
@@ -224,6 +230,10 @@ int main(void)
  // I2C_Scanner();   // Function call to identify slave address.
   HX711_Init();
   lcd_init();
+  /*MQ sensor calibration routine*/
+  MQ2_CalibrateR0();
+  MQ4_CalibrateR0();
+  MQ7_CalibrateR0();
 
 /*---------------------- HX711 tare offset (empty load cell)----------------*/
 offset = HX711_Tare(20);   // average of 20 samples
@@ -607,7 +617,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);//sound buzzer
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
@@ -707,23 +717,37 @@ void SensorTask(void const * argument)
 	 	        data.hx711_value = HX711_Read();
 	 	         data.weight = HX711_GetWeight(offset, factor);
 
-	 	         //MQ2
+	 	         //MQ2-LPG
 	 	          data.mq2_value = MQ2_ReadADC();
 	 	          data.mq2_ppm = MQ2_GetPPM(data.mq2_value);
-
-	 	          // MQ4
+	 	          // Added for debugging
+	 	          /*
+	 	           * uint32_t adc_val = MQ2_ReadADC();
+	 	           * printf("MQ2 raw ADC = %lu\r\n", adc_val);
+	 	            */
+	 	          // MQ4-Methane
 	 	          data.mq4_value = MQ4_ReadADC();
 	 	          data.mq4_ppm = MQ4_GetPPM(data.mq4_value);
+	 	         // Added for debugging
+	 	        /*
+	 	         *   uint32_t adc_val = MQ4_ReadADC();
+	 	         *   printf("MQ4 raw ADC = %lu\r\n", adc_val);
+	 	         */
 
-	 	          // MQ7
+	 	          // MQ7-CO
 	 	           data.mq7_value = MQ7_ReadADC();
 	 	           data.mq7_ppm = MQ7_GetPPM(data.mq7_value);
-
+	 	          // Added for debugging
+	 	          /*
+	 	            *  uint32_t adc_val = MQ7_ReadADC();
+	 	            *  printf("MQ7 raw ADC = %lu\r\n", adc_val);
+	 	          */
 	 	          // DHT22
-	              if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK)
-
-	 	          // Push sensor packet into sensor queue
-	 	          osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);
+	              if (DHT22_Read(GPIOA, GPIO_PIN_0, &data.temperature, &data.humidity) == HAL_OK){
+	              }else{
+	            	  printf("DHT22 read failed\r\r");
+	            	  osMessagePut(SensorQueueHandle, (uint32_t)&data, 0);// Push sensor packet into sensor queue
+	              }
 	              osDelay(1000); // print/update every 1 second
 
   }
@@ -764,12 +788,12 @@ void ProcessTask(void const * argument)
       else if (rate < -0.2f) status.leakType = LEAK_SLOW;
       else status.leakType = LEAK_NORMAL;
       */
-      if (sensor.mq2_ppm > 50 || sensor.mq4_ppm > 50 || sensor.mq7_ppm > 20) {
-    	  //inner if loop is added to check for sudden leaks
-          if (sensor.mq2_ppm > 100 || sensor.mq4_ppm > 100 || sensor.mq7_ppm > 100){
+      if (sensor.mq2_ppm > g_mq2_threshold_low || sensor.mq4_ppm > g_mq4_threshold_low || sensor.mq7_ppm > g_mq7_threshold_low) {
+          if (sensor.mq2_ppm > g_mq2_threshold_high || sensor.mq4_ppm > g_mq4_threshold_high || sensor.mq7_ppm > g_mq7_threshold_high) {
               status.leakType = LEAK_SUDDEN;
-          } else
+          } else {
               status.leakType = LEAK_SLOW;
+          }
       } else {
           status.leakType = LEAK_NORMAL;
       }
@@ -894,8 +918,6 @@ void CommunicationTask(void const * argument)
 	  evt = osMessageGet(CommQueueHandle, osWaitForever);
 	  	       if (evt.status == osEventMessage) {
 	  	       char *msg = (char*)evt.value.p;
-	  	       gsmMsg=(uint8_t*)evt.value.p;
-	  	       printf("GSM Response: %s\r\n", gsmMsg);
 	  	       StatusData_t *statusPtr = (StatusData_t *)evt.value.p;
 	  	       status = *statusPtr;
 
@@ -942,16 +964,24 @@ void CompensationTask(void const * argument)
 	osEvent evt;
     StatusData_t status;
   /* Infinite loop */
-  for(;;)
-  {
-	  evt = osMessageGet(CompQueueHandle, osWaitForever);
-	         if (evt.status == osEventMessage) {
-	        	 status = *(StatusData_t *)evt.value.p;
+    for(;;)
+       {
+           evt = osMessageGet(CompQueueHandle, osWaitForever);
+           if (evt.status == osEventMessage) {
+               status = *(StatusData_t *)evt.value.p;
 
-	        	 float humidityFactor = 1.0f - (status.humidity * 0.001f);
-	        	 float tempFactor     = 1.0f - (status.temperature - 25.0f) * 0.01f;
-	  }
-  }
+               float tempFactor     = 1.0f + (status.temperature - 25.0f) * 0.01f;
+               float humidityFactor = 1.0f + (status.humidity - 40.0f) * 0.001f;
+               float compFactor = tempFactor * humidityFactor;
+
+               g_mq2_threshold_low  = 50.0f  * compFactor;
+               g_mq4_threshold_low  = 50.0f  * compFactor;
+               g_mq7_threshold_low  = 20.0f  * compFactor;
+               g_mq2_threshold_high = 100.0f * compFactor;
+               g_mq4_threshold_high = 100.0f * compFactor;
+               g_mq7_threshold_high = 100.0f * compFactor;
+           }
+       }
 
   /* USER CODE END CompensationTask */
 }
@@ -982,6 +1012,17 @@ void lcd(void const * argument)
 	         evt = osMessageGet(LCDQueueHandle, osWaitForever);
 	         if (evt.status == osEventMessage) {
 	             status = *(StatusData_t*)evt.value.p;
+	             // Warning Screen: shown first, only when a leak is active
+	            if (status.leakType == LEAK_SUDDEN || status.leakType == LEAK_SLOW) {
+	            snprintf(line1, sizeof(line1), "!! GAS LEAK !!");
+	            snprintf(line2, sizeof(line2), "%s LEAK", leakTypeStr[status.leakType]);
+	            lcd_clear();
+	            lcd_set_cursor(0,0);
+	            lcd_send_string(line1);
+	            lcd_set_cursor(1,0);
+	            lcd_send_string(line2);
+	            osDelay(2000);
+	             	             }
 	             // Screen 1: Weight + Temp + Leak
 	             snprintf(line1, sizeof(line1), "W:%.1fkg T:%.1fC", status.weight, status.temperature);
 	             snprintf(line2, sizeof(line2), "L:%s D:%.0f", leakTypeStr[status.leakType], status.remainingGas);
@@ -1034,7 +1075,8 @@ void GSM(void const * argument)
 		         if (evt.status == osEventMessage)
 		         {
 		             status = *(StatusData_t *)evt.value.p;
-		             if (status.leakType == LEAK_SUDDEN||status.leakType==LEAK_SLOW)
+// change the if condition to if (status.leaktype==LEAK_SUDDEN||staus.leaktype==LEAK_SLOW) for testing purpose
+		             if (status.leakType == LEAK_SUDDEN)
 		             {
 		                 printf("\r\n*** SUDDEN LEAK DETECTED ***\r\n");
 		                 printf("Sending GSM alert...\r\n");

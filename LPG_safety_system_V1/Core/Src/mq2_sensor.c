@@ -25,7 +25,7 @@
  * Independent MQ-2 driver for STM32 HAL
  * Author: Rithika
  */
-#define MQ2_SUPPLY_VOLTAGE 3.3f
+
 
 static float MQ2_R0 = 1.0f;
 uint32_t MQ2_ReadADC(void) {
@@ -33,7 +33,7 @@ uint32_t MQ2_ReadADC(void) {
 }
 float MQ2_GetPPM(uint32_t adc_val) {
     float v_out = ((float)adc_val / ADC_RES) * VREF;
-    float v_sensor = v_out * 1.0f; // no divider gain
+    float v_sensor = v_out; //* 1.0f; // no divider gain
 
 
     if (v_sensor <= 0.01f || MQ2_R0 <= 0.0f) return 0.0f;

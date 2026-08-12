@@ -24,3 +24,4 @@ uint32_t Read_ADC_Channel(uint32_t channel)
 
     return value;
 }
+

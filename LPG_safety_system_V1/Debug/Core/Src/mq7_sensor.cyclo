@@ -1,3 +1,3 @@
-../Core/Src/mq7_sensor.c:14:10:MQ7_ReadADC	1
-../Core/Src/mq7_sensor.c:18:7:MQ7_GetPPM	4
-../Core/Src/mq7_sensor.c:31:7:MQ7_CalibrateR0	3
+../Core/Src/mq7_sensor.c:17:10:MQ7_ReadADC	1
+../Core/Src/mq7_sensor.c:21:7:MQ7_GetPPM	4
+../Core/Src/mq7_sensor.c:34:7:MQ7_CalibrateR0	3
